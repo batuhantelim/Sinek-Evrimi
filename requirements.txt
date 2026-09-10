@@ -1,0 +1,8 @@
+# --- Zorunlu ---
+numpy>=1.24
+PyYAML>=6.0
+
+# --- Opsiyonel ---
+# pygame sadece canli pencere icin gerekir (viz.mode: pygame).
+# Headless kare kaydetme (viz.mode: frames) saf Python + numpy ile calisir.
+#   pip install pygame

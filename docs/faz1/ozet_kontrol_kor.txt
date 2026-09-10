@@ -1,0 +1,11 @@
+== OZET (64.3 s, 3000 adim, 21.4 ms/adim) ==
+  adim              : 1 -> 3000
+  populasyon        : baslangic 120, son 352, tepe 1054, dip 120
+  ortalama enerji   : ilk yari 65.2, son yari 63.3
+  toplam dogum      : 3089
+  toplam olum       : 2857 (aclik 2633, tehlike 2, yaslilik 222)
+  en uzun soy zinciri: 17 nesil
+  yemek doluluk     : baslangic 0.600, son 0.260
+  kumelenme indeksi : 0.194
+  davranis cesitliligi: 0.00000   (Faz 1: klonlar, beklenen 0)
+  metrik CSV        : /home/user/Sinek-Evrimi/runs/kontrol_kor/metrics.csv

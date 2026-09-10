@@ -1,0 +1,142 @@
+# =====================================================================
+#  Sinek Evrimi — Faz 1 varsayilan konfigurasyonu
+#  Bu dosya "tek dogru kaynak"tir. Kendi deneyin icin kopyalayip
+#  degistirin:  python run.py --config deneylerim/kitlik.yaml
+#  Kismi dosya da verebilirsiniz: eksik anahtarlar buradan doldurulur.
+# =====================================================================
+
+# Ayni seed + ayni config => byte-byte ayni sonuc.
+seed: 42
+
+run:
+  name: faz1            # runs/<name>/ altina cikti yazilir
+  steps: 3000           # toplam simulasyon adimi
+  log_every: 250        # terminale ozet basma sikligi (adim)
+  stop_if_extinct: true # populasyon 0'a duserse erken bitir
+
+world:
+  width: 160            # izgara hucresi sayisi (x)
+  height: 100           # izgara hucresi sayisi (y)
+  toroidal: true        # kenarlar sarmali mi (donut dunya)
+
+  food:
+    # Kapasite alani: gaussian "yamalar" toplamiyla uretilir.
+    # Yamali dunya => sineklerin kaynak etrafinda kumelenmesi mumkun olur.
+    patches: 14           # yama sayisi
+    patch_radius: 11.0    # yama yaricapi (hucre)
+    patch_peak: 1.0       # yama merkezindeki kapasite
+    background: 0.05      # yama disi taban kapasite
+    initial_fill: 0.60    # baslangicta kapasitenin ne kadari dolu
+    regrowth_mode: logistic   # logistic | constant
+    regrowth_rate: 0.010      # adim basina yenilenme hizi
+    seed_rate: 0.0006         # bos hucrelerin "tohumlanma" hizi (logistic)
+    energy_per_unit: 22.0     # 1 birim yemek = kac enerji
+
+  hazard:
+    count: 5              # sabit tehlike diski sayisi
+    radius: 6.0
+    damage: 3.5           # icindeyken adim basina enerji kaybi
+    avoid_food_patches: true  # tehlikeleri yama merkezlerinden uzaga koy
+
+  climate:
+    # Faz 1'de sadece kaydedilir/cizilir; davranisa etkisi yok.
+    # Faz 2+ icin sensor olarak baglanabilir.
+    temperature_gradient: vertical   # none | vertical | horizontal
+    light_gradient: none
+
+agents:
+  initial_count: 120
+  max_count: 1200         # populasyon tavani (bellek/hiz emniyeti)
+  spawn: scatter          # scatter | center
+
+  energy:
+    initial: 65.0
+    max: 160.0
+    metabolism: 0.60      # adim basina sabit yasam maliyeti
+    move_cost: 1.00       # hiz^2 basina hareket maliyeti
+    eat_rate: 0.35        # adim basina agiza sigan max yemek birimi
+
+  lifespan: 900           # ortalama azami yas (adim)
+  lifespan_jitter: 120    # dogumda +/- rastgele sapma
+
+  senses:
+    food_radius: 9.0      # yemek gradyani tarama yaricapi (hucre)
+    hazard_radius: 12.0
+    neighbor_radius: 8.0
+
+  motors:
+    max_speed: 0.85       # hucre / adim
+    max_turn: 0.45        # radyan / adim
+
+  reproduction:
+    enabled: true
+    energy_threshold: 130.0  # bu enerjinin uzerinde bolunur
+    min_age: 50
+    cost: 15.0               # bolunme sabit maliyeti
+    child_share: 0.45        # cocuga aktarilan enerji orani
+    spawn_radius: 1.5
+
+brain:
+  type: reflex            # kayitli beyin backend'i (bkz. sinek/brains/)
+  turn_gain: 1.6          # ham istegin donuse cevrim kazanci
+
+genome:
+  # Faz 1: TUM ajanlar bu parametrelerin AYNI kopyasini tasir (klonlar).
+  # Faz 2'de mutasyon acilinca bu degerler ayrismaya baslayacak.
+  params:
+    food_attraction: 1.00   # yemek gradyanina cekim
+    hazard_avoidance: 1.60  # tehlikeden kacinma
+    crowd_bias: 0.00        # + : komsuya cekim (surulesme), - : itme
+    wander: 0.30            # rastgele yon gurultusu
+    speed_pref: 0.70        # tercih edilen hiz (0..1)
+    eat_threshold: 0.02     # bu miktarin altinda yemek yemez
+    hunger_gain: 1.20       # aclik yemek arayisini ne kadar guclendirir
+    graze_slowdown: 0.75    # yemek uzerinde yavaslama (alan-kisitli arama)
+    panic_speed: 0.60       # tehlike yakininda hizlanma
+    hunger_speed: 0.25      # aclikta hizlanma
+
+evolution:
+  enabled: false          # FAZ 1: mutasyon KAPALI -> klonlar. Faz 2'de acilacak.
+  mutation_rate: 0.25     # bir parametrenin mutasyona ugrama olasiligi
+  mutation_sigma: 0.08    # gaussian mutasyon std sapmasi
+  param_bounds:           # mutasyon sonrasi kirpma araliklari
+    food_attraction: [0.0, 3.0]
+    hazard_avoidance: [0.0, 3.0]
+    crowd_bias: [-2.0, 2.0]
+    wander: [0.0, 1.5]
+    speed_pref: [0.0, 1.0]
+    eat_threshold: [0.0, 0.5]
+    hunger_gain: [0.0, 3.0]
+    graze_slowdown: [0.0, 1.0]
+    panic_speed: [0.0, 2.0]
+    hunger_speed: [0.0, 1.5]
+
+rules:
+  # FAZ 3 icin ayrilmis kural motoru. Faz 1'de hepsi etkisiz.
+  # Kural degistirip sonucu gormek icin buradan oynayacaksiniz.
+  share:
+    enabled: false
+    amount: 4.0           # verilen enerji
+    reward: 0.0           # verene ek odul
+    radius: 2.0
+  attack:
+    enabled: false
+    damage: 8.0
+    steal_ratio: 0.5      # calinan enerjinin ne kadari saldirana gecer
+    penalty: 0.0          # saldirana ek ceza
+    radius: 1.5
+
+metrics:
+  enabled: true
+  every: 1                # kac adimda bir satir yazilsin
+  csv: metrics.csv
+
+viz:
+  mode: frames            # none | frames | pygame
+  scale: 6                # 1 dunya hucresi = kac piksel
+  every: 20               # kac adimda bir kare
+  frames_dir: frames
+  max_frames: 400
+  fps: 45                 # sadece pygame
+  show_hazards: true
+  hud: true
