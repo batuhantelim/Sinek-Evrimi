@@ -1,5 +1,6 @@
 # =====================================================================
-#  Sinek Evrimi — Faz 1 varsayilan konfigurasyonu
+#  Sinek Evrimi — Faz 2 varsayilan konfigurasyonu (mutasyon + secilim)
+#  Faz 1 (klonlar) icin: python run.py --config experiments/faz1_klonlar.yaml
 #  Bu dosya "tek dogru kaynak"tir. Kendi deneyin icin kopyalayip
 #  degistirin:  python run.py --config deneylerim/kitlik.yaml
 #  Kismi dosya da verebilirsiniz: eksik anahtarlar buradan doldurulur.
@@ -9,8 +10,8 @@
 seed: 42
 
 run:
-  name: faz1            # runs/<name>/ altina cikti yazilir
-  steps: 3000           # toplam simulasyon adimi
+  name: faz2            # runs/<name>/ altina cikti yazilir
+  steps: 8000           # toplam simulasyon adimi
   log_every: 250        # terminale ozet basma sikligi (adim)
   stop_if_extinct: true # populasyon 0'a duserse erken bitir
 
@@ -77,12 +78,17 @@ agents:
     spawn_radius: 1.5
 
 brain:
-  type: reflex            # kayitli beyin backend'i (bkz. sinek/brains/)
-  turn_gain: 1.6          # ham istegin donuse cevrim kazanci
+  type: rnn               # kayitli backend: reflex | rnn  (bkz. sinek/brains/)
+  hidden: 12              # rnn: gizli noron sayisi (genom boyutunu belirler)
+  rnn_leak: 0.5           # rnn: 0 = tam bellek, 1 = belleksiz (sizintili integrator)
+  noise: 0.15             # rnn: donus gurultusu olcegi (genomdaki 'wander' ile carpilir)
+  init_sigma: 0.60        # rnn: baslangic agirlik dagiliminin std sapmasi
+  turn_gain: 1.6          # reflex: ham istegin donuse cevrim kazanci
 
 genome:
-  # Faz 1: TUM ajanlar bu parametrelerin AYNI kopyasini tasir (klonlar).
-  # Faz 2'de mutasyon acilinca bu degerler ayrismaya baslayacak.
+  # Kurucu genom. rnn beyninde bu parametrelerden yalnizca 'wander'
+  # kullanilir (kesif gurultusu olcegi); geri kalani reflex beynin devresidir.
+  # evolution.founder_spread ile bu degerlerin etrafinda cesitlilik uretilir.
   params:
     food_attraction: 1.00   # yemek gradyanina cekim
     hazard_avoidance: 1.60  # tehlikeden kacinma
@@ -96,10 +102,43 @@ genome:
     hunger_speed: 0.25      # aclikta hizlanma
 
 evolution:
-  enabled: false          # FAZ 1: mutasyon KAPALI -> klonlar. Faz 2'de acilacak.
-  mutation_rate: 0.25     # bir parametrenin mutasyona ugrama olasiligi
-  mutation_sigma: 0.08    # gaussian mutasyon std sapmasi
-  param_bounds:           # mutasyon sonrasi kirpma araliklari
+  enabled: true           # FAZ 2: mutasyon ACIK. false -> klonlar (Faz 1 kontrolu)
+
+  # --- secilim modu ---
+  # steady_state : Faz 1 ekolojisi; ureme surekli, secilim ortuk (kim cok
+  #                yerse cok bolunur). Boom-bust salinimi korunur.
+  # generational : Klasik GA; sabit uzunlukta nesiller, nesil sonunda toplu
+  #                secilim. "Ortalama basari nesiller boyunca artiyor mu"
+  #                sorusunun en temiz olculdugu mod.
+  mode: generational
+  generation_length: 250  # generational: bir neslin adim sayisi
+  reset_world: true       # generational: her nesilde yemek stogu sifirlansin mi
+  elite_count: 3          # en iyi N genom mutasyonsuz gecer
+  tournament_size: 3      # turnuva secilimi aday sayisi (buyuk = sert secilim)
+
+  # --- neyin "basari" sayildigi ---
+  # Bunlari degistirmek evrimin YONUNU degistirir. Deneyin asil dugmesi bu.
+  fitness:
+    age: 1.0              # hayatta kalinan adim
+    children: 4.0         # birakilan yavru (generational modda hep 0)
+    food_eaten: 8.0       # toplanan yemek birimi
+    energy: 0.5           # olcum anindaki enerji
+    distance: 0.0         # katedilen mesafe (ornek: gezginligi odullendir)
+
+  # --- baslangic cesitliligi ---
+  # 0.0 -> herkes kurucu genomun klonu (Faz 1)
+  # 1.0 -> parametreler dagilir, sinir aglari tamamen bagimsiz rastgele
+  founder_spread: 1.0
+  founder_param_sigma: 0.25
+
+  # --- mutasyon ---
+  mutation_rate: 0.25       # isimli parametre basina mutasyon olasiligi
+  mutation_sigma: 0.08      # parametre mutasyonu std sapmasi
+  weight_mutation_rate: 0.10   # agirlik basina olasilik (agirliklar cok kalabalik)
+  weight_mutation_sigma: 0.20  # agirlik mutasyonu std sapmasi
+  weight_clip: 4.0             # agirliklarin mutlak siniri
+
+  param_bounds:           # parametre mutasyonu sonrasi kirpma araliklari
     food_attraction: [0.0, 3.0]
     hazard_avoidance: [0.0, 3.0]
     crowd_bias: [-2.0, 2.0]

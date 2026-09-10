@@ -14,7 +14,16 @@ from sinek.config import load_config
 from sinek.metrics import behavior_diversity
 from sinek.simulation import Simulation
 
-BASE = ["viz.mode=none", "metrics.enabled=false"]
+# Faz 1 testleri kendi fazlarini sabitler: refleks beyin, mutasyon yok, klonlar.
+# (config.yaml varsayilani artik Faz 2'dir.)
+BASE = [
+    "viz.mode=none",
+    "metrics.enabled=false",
+    "brain.type=reflex",
+    "evolution.enabled=false",
+    "evolution.mode=steady_state",
+    "evolution.founder_spread=0.0",
+]
 
 
 def make(steps=0, **over):

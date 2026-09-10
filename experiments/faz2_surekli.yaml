@@ -1,0 +1,9 @@
+# FAZ 2, surekli (steady-state) evrim: Faz 1'in ekolojisi + mutasyon.
+# Nesil siniri yok; kim cok yerse cok bolunur. Secilim ortuk ve sureklidir,
+# boom-bust salinimi korunur. Tierra/Avida'ya daha yakin, GA'ya daha uzak.
+#   python run.py --config experiments/faz2_surekli.yaml
+run:
+  name: faz2_surekli
+  steps: 8000
+evolution:
+  mode: steady_state

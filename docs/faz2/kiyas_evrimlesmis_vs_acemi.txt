@@ -1,0 +1,9 @@
+kayit: 120 genom | beyin rnn (hidden 12) | nesil 32
+olcum: 500 adim x 3 dunya, ureme ve secilim KAPALI
+
+  olcut                             evrimlesmis      acemi     oran
+  hayatta kalan orani                     0.931      0.461    2.02x
+  ajan basina yemek                     113.932     57.668    1.98x
+  koku gradyaniyla hizalanma              0.424      0.013   32.60x
+  yemek uzerinde gecen zaman              0.461      0.440    1.05x
+  tehlike icinde gecen zaman              0.064      0.046    1.40x

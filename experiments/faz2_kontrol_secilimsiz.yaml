@@ -1,0 +1,18 @@
+# FAZ 2 KONTROL GRUBU: secilim baskisi YOK, sadece surukleniyor (genetic drift).
+#
+# Tum fitness agirliklari 0 -> her birey esit fitness -> turnuva secilimi
+# rastgele ebeveyn secer. Mutasyon ve nesil dongusu aynen calisir.
+# Asil kosumun kazanimi bu kosumu asmiyorsa, gordugumuz sey evrim degil
+# sadece rastgele suruklenmedir.
+#   python run.py --config experiments/faz2_kontrol_secilimsiz.yaml
+run:
+  name: faz2_kontrol_secilimsiz
+  steps: 8000
+evolution:
+  fitness:
+    age: 0.0
+    children: 0.0
+    food_eaten: 0.0
+    energy: 0.0
+    distance: 0.0
+  elite_count: 0          # elitizm de kapali; yoksa gizli bir secilim kalir

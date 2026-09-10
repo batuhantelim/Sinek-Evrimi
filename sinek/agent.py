@@ -140,7 +140,17 @@ class Agent:
         return gained
 
     # ------------------------------------------------------------------
-    @property
-    def fitness(self) -> float:
-        """Faz 2'de secilim baskisi icin kullanilacak basit basari olcusu."""
-        return self.age + 4.0 * self.children + 0.5 * self.food_eaten
+    def fitness(self, weights: dict[str, float]) -> float:
+        """Secilim baskisi. Agirliklar config'ten gelir (evolution.fitness).
+
+        Neyin "basari" sayildigini kod degil kullanici tanimlar: uzun yasamak
+        mi, cok cocuk birakmak mi, cok yemek mi? Bu agirliklari degistirmek
+        evrimin yonunu degistirir.
+        """
+        return (
+            float(weights.get("age", 0.0)) * self.age
+            + float(weights.get("children", 0.0)) * self.children
+            + float(weights.get("food_eaten", 0.0)) * self.food_eaten
+            + float(weights.get("energy", 0.0)) * self.energy
+            + float(weights.get("distance", 0.0)) * self.distance
+        )

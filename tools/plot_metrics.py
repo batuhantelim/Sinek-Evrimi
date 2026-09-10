@@ -29,9 +29,12 @@ DIM = (120, 130, 150)
 SERIES = [(250, 200, 90), (90, 210, 140), (120, 170, 255), (245, 120, 120), (200, 140, 245)]
 
 DEFAULT_COLS = "population,mean_energy,food_fill,clustering,behavior_diversity"
+GENERATION_COLS = "mean_fitness,max_fitness,mean_food_eaten,survivors,weight_diversity"
 
 
 def read_csv(path: str) -> dict[str, np.ndarray]:
+    if not os.path.exists(path):
+        raise SystemExit(f"CSV bulunamadi: {path}")
     with open(path, newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
     if not rows:
@@ -59,10 +62,18 @@ def _line(img, x0, y0, x1, y1, color):
             img[y, x] = color
 
 
-def plot(runs: list[str], cols: list[str], out: str, width: int = 900, panel_h: int = 150) -> str:
+def plot(
+    runs: list[str],
+    cols: list[str],
+    out: str,
+    width: int = 900,
+    panel_h: int = 150,
+    csv_name: str = "metrics.csv",
+    x_col: str = "step",
+) -> str:
     data = []
     for run in runs:
-        path = run if run.endswith(".csv") else os.path.join(run, "metrics.csv")
+        path = run if run.endswith(".csv") else os.path.join(run, csv_name)
         data.append((os.path.basename(os.path.dirname(path) or path), read_csv(path)))
 
     pad_l, pad_r, pad_t = 46, 12, 16
@@ -107,8 +118,9 @@ def plot(runs: list[str], cols: list[str], out: str, width: int = 900, panel_h: 
         draw_text(img, f"{hi:.4g}"[:9], 4, top - 1, DIM)
         draw_text(img, f"{lo:.4g}"[:9], 4, top + panel_h - GLYPH_H - 1, DIM)
 
-    steps = data[0][1]["step"]
-    draw_text(img, f"ADIM 0 - {int(steps[-1])}", pad_l, height - 14, DIM)
+    axis = data[0][1].get(x_col)
+    label = f"{x_col} 0 - {int(axis[-1])}" if axis is not None and axis.size else x_col
+    draw_text(img, label.upper(), pad_l, height - 14, DIM)
     write_png(out, img)
     return out
 
@@ -119,13 +131,25 @@ def main(argv=None) -> int:
     ap.add_argument("--cols", default=DEFAULT_COLS)
     ap.add_argument("--out", default=None)
     ap.add_argument("--width", type=int, default=900)
+    ap.add_argument(
+        "--generations",
+        action="store_true",
+        help="metrics.csv yerine generations.csv ciz (nesil bazli evrim egrileri)",
+    )
+    ap.add_argument("--x", default=None, help="x ekseni etiketi icin sutun (varsayilan: step)")
     args = ap.parse_args(argv)
 
+    csv_name = "generations.csv" if args.generations else "metrics.csv"
+    x_col = args.x or ("generation" if args.generations else "step")
+    if args.generations and args.cols == DEFAULT_COLS:
+        args.cols = GENERATION_COLS
+
+    default_name = "generations.png" if args.generations else "metrics.png"
     out = args.out or os.path.join(
-        args.runs[0] if os.path.isdir(args.runs[0]) else ".", "metrics.png"
+        args.runs[0] if os.path.isdir(args.runs[0]) else ".", default_name
     )
     cols = [c.strip() for c in args.cols.split(",") if c.strip()]
-    print("yazildi:", plot(args.runs, cols, out, width=args.width))
+    print("yazildi:", plot(args.runs, cols, out, width=args.width, csv_name=csv_name, x_col=x_col))
     return 0
 
 

@@ -231,6 +231,11 @@ class World:
         cx, cy = self.cell(x, y)
         return float(self.hazard_damage_field[cy, cx])
 
+    def reset_food(self) -> None:
+        """Yemek stogunu baslangic durumuna dondurur (nesil dongusu icin)."""
+        self.food = (self.food_capacity * float(self.cfg.world.food.initial_fill)).astype(np.float32)
+        self.update_food_perception()
+
     # ------------------------------------------------------------------ adim
     def step(self) -> None:
         """Yemek yenilenmesi (vektorel, adim basina bir kez)."""

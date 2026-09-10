@@ -8,10 +8,21 @@ Adim sirasi (determinizm icin sabit):
   5. olumler
   6. uremeler
   7. Faz 3 sosyal kurallar (rules.*) — Faz 1'de etkisiz
-  8. metrikler
+  8. nesil siniri geldiyse secilim + yeni nesil (yalnizca generational modda)
 
 Tum rastgelelik tek bir np.random.Generator'dan gelir; ajanlar hep ayni
 sirayla cizim yapar. Ayni seed -> ayni sonuc.
+
+IKI EVRIM MODU (evolution.mode)
+-------------------------------
+steady_state : Faz 1'in ekolojisi. Ureme surekli ve aseksuel; enerji esigini
+               asan bolunur. Secilim ortuk: cok yemek bulan cok cocuk birakir.
+               Boom-bust salinimi ve populasyon dinamigi korunur.
+generational : Klasik GA. Sabit uzunlukta nesiller; nesil sonunda TUM birey
+               havuzu (yasayanlar + o nesilde olenler) fitness'a gore
+               siralanir, turnuva secilimi + elitizm ile yeni nesil kurulur,
+               dunya sifirlanir. "Nesiller boyunca ortalama basari artiyor mu"
+               sorusu en temiz burada olculur.
 """
 
 from __future__ import annotations
@@ -21,9 +32,10 @@ import math
 
 import numpy as np
 
-from .agent import Agent, M
+from .agent import Agent
 from .brains import make_brain
 from .genome import Genome, founder_genome
+from .metrics import behavior_diversity, genome_param_means, weight_diversity
 from .spatial import SpatialHash
 from .world import World
 
@@ -31,7 +43,7 @@ DEATH_KEYS = {"starved": "death_starved", "hazard": "death_hazard", "old_age": "
 
 
 class Simulation:
-    def __init__(self, cfg, seed: int | None = None):
+    def __init__(self, cfg, seed: int | None = None, initial_genomes=None):
         self.cfg = cfg
         self.seed = int(cfg.seed if seed is None else seed)
         self.rng = np.random.default_rng(self.seed)
@@ -46,10 +58,34 @@ class Simulation:
 
         self.step_index = 0
         self._next_id = 0
-        self.founder = founder_genome(cfg)
-        self.agents: list[Agent] = [
-            self._spawn(self.founder.copy()) for _ in range(int(cfg.agents.initial_count))
-        ]
+
+        # --- evrim ayarlari ---
+        self.mode = str(cfg.get("evolution.mode", "steady_state"))
+        if self.mode not in ("steady_state", "generational"):
+            raise ValueError(
+                f"bilinmeyen evolution.mode={self.mode!r} (steady_state | generational)"
+            )
+        self.generation_length = max(1, int(cfg.get("evolution.generation_length", 250)))
+        self.fitness_weights = _as_dict(cfg.get("evolution.fitness", {}))
+        # Nesilli modda ureme kapatilir: secilim nesil sonunda toplu yapilir,
+        # yoksa iki secilim mekanizmasi birbirine karisir.
+        self._repro_enabled = bool(cfg.agents.reproduction.enabled) and self.mode != "generational"
+
+        self.founder = founder_genome(cfg, self.rng)
+        n0 = int(cfg.agents.initial_count)
+        if initial_genomes:
+            # Kayitli koloniyle tohumla; havuz kucukse basa donerek tekrarla.
+            seeds = [initial_genomes[i % len(initial_genomes)].copy() for i in range(n0)]
+            self.agents: list[Agent] = [self._spawn(g) for g in seeds]
+        else:
+            spread = float(cfg.get("evolution.founder_spread", 0.0))
+            self.agents = [
+                self._spawn(self.founder.diversified(cfg, self.rng, spread)) for _ in range(n0)
+            ]
+
+        self.generation = 0
+        self.graveyard: list[Agent] = []  # bu neslin oluleri (secilim havuzunda kalirlar)
+        self.generation_rows: list[dict] = []
         self.stats_step = _empty_stats()
         self.stats_total = _empty_stats()
         self.extinct_at: int | None = None
@@ -135,7 +171,7 @@ class Simulation:
         self.agents = survivors
 
         # 6) ureme
-        if bool(cfg.agents.reproduction.enabled):
+        if self._repro_enabled:
             self._reproduce()
 
         # 7) sosyal kurallar (Faz 3 kancasi)
@@ -147,11 +183,19 @@ class Simulation:
         if not self.agents and self.extinct_at is None:
             self.extinct_at = self.step_index
 
+        # 8) nesil siniri
+        if self.mode == "generational" and self.step_index % self.generation_length == 0:
+            self._next_generation()
+
     def _kill(self, a: Agent, cause: str) -> None:
         a.alive = False
         a.death_cause = cause
         self.stats_step["deaths"] += 1
         self.stats_step[DEATH_KEYS[cause]] += 1
+        if self.mode == "generational":
+            # Erken olenler de secilim havuzunda kalir; yoksa "hicbir sey
+            # yapmayip hayatta kalmak" yapay bir avantaja donusur.
+            self.graveyard.append(a)
 
     def _reproduce(self) -> None:
         cfg = self.cfg
@@ -182,6 +226,72 @@ class Simulation:
             newborns.append(child)
             self.stats_step["births"] += 1
         self.agents.extend(newborns)
+
+    # ------------------------------------------------------------- secilim
+    def _next_generation(self) -> None:
+        """Nesil sonu: fitness'a gore secilim + yeni neslin kurulmasi.
+
+        Secilim havuzu = hayatta kalanlar + bu nesilde olenler. Olenleri
+        disarida birakmak, "erken olen hic yarismamis" sayilmasina yol acar
+        ve secilimi carpitir.
+        """
+        cfg = self.cfg
+        pool = self.agents + self.graveyard
+        if not pool:
+            return  # koloni tukendi; run() dongusu zaten durduracak
+
+        fits = np.array([a.fitness(self.fitness_weights) for a in pool], dtype=np.float64)
+        order = np.argsort(-fits, kind="stable")  # stable => determinizm
+        self.generation_rows.append(self._generation_row(pool, fits, order))
+
+        n_new = int(cfg.agents.initial_count)
+        elite = max(0, min(int(cfg.get("evolution.elite_count", 2)), len(pool), n_new))
+        tournament = max(2, int(cfg.get("evolution.tournament_size", 4)))
+
+        # elitler: en iyi genomlar mutasyonsuz gecer (kazanimi kaybetmemek icin)
+        parents = [pool[int(order[i])] for i in range(elite)]
+        # geri kalan: turnuva secilimi — k rastgele aday, en iyisi ebeveyn olur
+        while len(parents) < n_new:
+            idx = self.rng.integers(0, len(pool), size=tournament)
+            parents.append(pool[int(idx[int(np.argmax(fits[idx]))])])
+
+        self.generation += 1
+        if bool(cfg.get("evolution.reset_world", True)):
+            self.world.reset_food()
+
+        newborn: list[Agent] = []
+        for i, parent in enumerate(parents[:n_new]):
+            if i < elite:
+                genome = parent.genome.copy()
+                genome.lineage = parent.genome.lineage + 1
+            else:
+                genome = parent.genome.child(cfg, self.rng)
+            child = self._spawn(genome)
+            child.parent_id = parent.id
+            newborn.append(child)
+
+        self.agents = newborn
+        self.graveyard = []
+
+    def _generation_row(self, pool, fits: np.ndarray, order: np.ndarray) -> dict:
+        survivors = sum(1 for a in pool if a.alive)
+        row = {
+            "generation": self.generation,
+            "step": self.step_index,
+            "pool": len(pool),
+            "survivors": survivors,
+            "mean_fitness": round(float(fits.mean()), 3),
+            "median_fitness": round(float(np.median(fits)), 3),
+            "max_fitness": round(float(fits.max()), 3),
+            "mean_age": round(float(np.mean([a.age for a in pool])), 2),
+            "mean_food_eaten": round(float(np.mean([a.food_eaten for a in pool])), 3),
+            "best_food_eaten": round(float(pool[int(order[0])].food_eaten), 3),
+            "behavior_diversity": round(behavior_diversity(pool), 5),
+            "weight_diversity": round(weight_diversity(pool), 5),
+        }
+        for name, value in genome_param_means(pool).items():
+            row[f"gp_{name}"] = round(value, 4)
+        return row
 
     def _apply_social_rules(self) -> None:
         """Faz 3: paylasma / saldiri. Config'te kapaliysa hicbir sey yapmaz."""
@@ -215,11 +325,19 @@ class Simulation:
                     dtype=np.float64,
                 ).tobytes()
             )
+            # genom da duruma dahil: mutasyon akisi bozulursa test yakalasin
+            h.update(np.round(a.genome.vector(), 6).tobytes())
+            if a.genome.weights.size:
+                h.update(np.round(a.genome.weights.astype(np.float64), 5).tobytes())
         return h.hexdigest()[:16]
 
     @property
     def population(self) -> int:
         return len(self.agents)
+
+
+def _as_dict(node) -> dict:
+    return node.to_dict() if hasattr(node, "to_dict") else dict(node or {})
 
 
 def _empty_stats() -> dict:

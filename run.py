@@ -19,6 +19,7 @@ import time
 
 from sinek.config import DEFAULT_CONFIG_PATH, load_config
 from sinek.metrics import Metrics
+from sinek.persistence import load_population, save_population
 from sinek.simulation import Simulation
 from sinek.sinks import make_sink
 
@@ -51,6 +52,14 @@ def parse_args(argv=None) -> argparse.Namespace:
         action="store_true",
         help="ayni seed'le iki kez calistirip durum parmak izlerini karsilastir",
     )
+    p.add_argument(
+        "--load-genomes",
+        default=None,
+        metavar="POPULATION.NPZ",
+        help="kayitli bir koloniyle basla (bkz. runs/<name>/population.npz)",
+    )
+    p.add_argument("--load-top", type=int, default=None, help="kayittan en iyi N genomu al")
+    p.add_argument("--no-save-genomes", action="store_true", help="son populasyonu kaydetme")
     p.add_argument("--quiet", action="store_true")
     return p.parse_args(argv)
 
@@ -96,23 +105,41 @@ def main(argv=None) -> int:
     os.makedirs(out_dir, exist_ok=True)
     cfg.dump(os.path.join(out_dir, "config_used.yaml"))
 
-    sim = Simulation(cfg)
-    metrics = Metrics(cfg, out_dir)
+    seed_genomes = None
+    if args.load_genomes:
+        seed_genomes, seed_meta = load_population(args.load_genomes, cfg, top=args.load_top)
+        if not args.quiet:
+            print(
+                f"   tohum: {len(seed_genomes)} genom <- {args.load_genomes} "
+                f"(nesil {seed_meta['generation']}, beyin {seed_meta['brain_type']})"
+            )
+
+    sim = Simulation(cfg, initial_genomes=seed_genomes)
+    metrics = Metrics(cfg, out_dir, sim.founder.params.keys())
     sink = make_sink(cfg, out_dir)
     log_every = max(1, int(cfg.get("run.log_every", 200)))
 
     if not args.quiet:
         print(f"== Sinek Evrimi | kosum '{cfg.run.name}' | seed {sim.seed} ==")
+        weights = sim.founder.weights.size
         print(
             f"   dunya {sim.world.width}x{sim.world.height} | "
-            f"beyin '{cfg.brain.type}' | mutasyon "
-            f"{'ACIK' if cfg.get('evolution.enabled') else 'KAPALI (klonlar)'} | "
-            f"{steps} adim"
+            f"beyin '{cfg.brain.type}'"
+            + (f" ({weights} agirlik)" if weights else "")
+            + f" | mutasyon {'ACIK' if cfg.get('evolution.enabled') else 'KAPALI (klonlar)'}"
+            f" | mod {sim.mode} | {steps} adim"
         )
+        if sim.mode == "generational":
+            print(
+                f"   nesil uzunlugu {sim.generation_length} adim -> "
+                f"~{steps // sim.generation_length} nesil | "
+                f"fitness agirliklari {sim.fitness_weights}"
+            )
         print(f"   cikti: {out_dir}")
         print(f"   {'adim':>6} {'N':>5} {'enerji':>7} {'yemek%':>7} {'dogum':>6} {'olum':>6} {'kume':>6}")
 
     t0 = time.time()
+    generations_logged = 0
     try:
         for _ in range(steps):
             sim.step()
@@ -120,6 +147,16 @@ def main(argv=None) -> int:
             if row is not None:
                 sim.last_metrics = row
             sink.emit(sim)
+
+            if not args.quiet and len(sim.generation_rows) > generations_logged:
+                for g in sim.generation_rows[generations_logged:]:
+                    print(
+                        f"   >> nesil {g['generation']:3d} | fitness ort {g['mean_fitness']:8.1f} "
+                        f"max {g['max_fitness']:8.1f} | yemek {g['mean_food_eaten']:6.2f} "
+                        f"| yasayan {g['survivors']:4d}/{g['pool']:4d} "
+                        f"| cesitlilik {g['weight_diversity'] or g['behavior_diversity']:.3f}"
+                    )
+                generations_logged = len(sim.generation_rows)
 
             if not args.quiet and sim.step_index % log_every == 0:
                 r = sim.last_metrics or {}
@@ -145,8 +182,13 @@ def main(argv=None) -> int:
         "",
         f"== OZET ({elapsed:.1f} s, {sim.step_index} adim, "
         f"{elapsed / max(1, sim.step_index) * 1000:.1f} ms/adim) ==",
-        metrics.summary(),
+        metrics.summary(sim),
     ]
+    if not args.no_save_genomes and sim.agents:
+        pop_path = save_population(
+            os.path.join(out_dir, "population.npz"), sim, note=str(cfg.run.name)
+        )
+        summary.append(f"  populasyon        : {pop_path}")
     if metrics.path:
         summary.append(f"  metrik CSV        : {metrics.path}")
     frames = getattr(sink, "paths", None)

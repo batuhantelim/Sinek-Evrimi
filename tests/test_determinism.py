@@ -11,19 +11,32 @@ from sinek.simulation import Simulation
 
 BASE = ["viz.mode=none", "metrics.enabled=false", "agents.initial_count=40"]
 
+# Faz 1 (refleks + klon) ve Faz 2 (rnn + mutasyon + nesil dongusu) ayri ayri
+# sinanir: mutasyon ve secilim de rastgelelik tuketir, akis bozulursa hash kacar.
+PHASE1 = ["brain.type=reflex", "evolution.enabled=false", "evolution.mode=steady_state",
+          "evolution.founder_spread=0.0"]
+PHASE2 = ["brain.type=rnn", "evolution.enabled=true", "evolution.mode=generational",
+          "evolution.generation_length=40", "evolution.founder_spread=1.0"]
 
-def run(steps=120, **over):
-    ov = BASE + [f"{k.replace('__', '.')}={v}" for k, v in over.items()]
+
+def run(steps=120, phase=PHASE2, **over):
+    ov = BASE + list(phase) + [f"{k.replace('__', '.')}={v}" for k, v in over.items()]
     sim = Simulation(load_config(overrides=ov))
     sim.run(steps)
     return sim
 
 
 class TestDeterminism(unittest.TestCase):
-    def test_same_seed_same_state(self):
-        a, b = run(), run()
+    def test_same_seed_same_state_phase1(self):
+        a, b = run(phase=PHASE1), run(phase=PHASE1)
         self.assertEqual(a.state_hash(), b.state_hash())
         self.assertEqual(a.population, b.population)
+
+    def test_same_seed_same_state_phase2(self):
+        """Nesil sinirlarini asarak: mutasyon + secilim de deterministik olmali."""
+        a, b = run(), run()
+        self.assertEqual(a.state_hash(), b.state_hash())
+        self.assertGreaterEqual(a.generation, 2, "test nesil sinirini asmali")
 
     def test_different_seed_diverges(self):
         a, b = run(seed=1), run(seed=2)

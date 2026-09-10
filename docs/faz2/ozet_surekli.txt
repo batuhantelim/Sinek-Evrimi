@@ -1,0 +1,12 @@
+== OZET (119.2 s, 8000 adim, 14.9 ms/adim) ==
+  adim              : 1 -> 8000
+  populasyon        : baslangic 120, son 225, tepe 1086, dip 111
+  ortalama enerji   : ilk yari 67.4, son yari 69.5
+  toplam dogum      : 4317
+  toplam olum       : 4212 (aclik 2007, tehlike 1142, yaslilik 1063)
+  en uzun soy zinciri: 25 nesil
+  yemek doluluk     : baslangic 0.601, son 0.115
+  kumelenme indeksi : 0.381
+  davranis cesitliligi: 0.15698   
+  agirlik cesitliligi : 0.37777
+  metrik CSV        : /home/user/Sinek-Evrimi/runs/faz2_surekli/metrics.csv

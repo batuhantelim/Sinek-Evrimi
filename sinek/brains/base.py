@@ -39,6 +39,12 @@ class Brain(ABC):
 
     backend_name: str = "?"
 
+    #: Bu backend'in genom parametrelerinden HANGILERINI okudugu.
+    #: None = hepsi. Okunmayan parametreler davranisa etki etmez; genomda
+    #: tasinmaya devam ederler ve secilim baskisi altinda olmadiklari icin
+    #: yerlesik bir NOTR SURUKLENME (genetic drift) referansi olustururlar.
+    uses_params: tuple[str, ...] | None = None
+
     def __init__(self, genome, cfg):
         self.genome = genome
         self.cfg = cfg
@@ -56,10 +62,23 @@ class Brain(ABC):
         """Ic durumu (recurrent state) sifirlar. Durumsuz beyinler icin no-op."""
 
 
-def make_brain(cfg, genome) -> Brain:
+def brain_class(cfg) -> type["Brain"]:
     name = cfg.get("brain.type", "reflex")
     if name not in _REGISTRY:
         raise KeyError(
             f"bilinmeyen brain.type={name!r}. Kayitli olanlar: {registered_brains()}"
         )
-    return _REGISTRY[name](genome, cfg)
+    return _REGISTRY[name]
+
+
+def genome_size_for(cfg) -> int:
+    """Secili backend'in genomdan bekledigi serbest agirlik sayisi.
+
+    Genom uretimi (sinek/genome.py) bunu okur; beyin degistiginde genom
+    boyutu kendiliginden dogru olur.
+    """
+    return int(brain_class(cfg).genome_size(cfg))
+
+
+def make_brain(cfg, genome) -> Brain:
+    return brain_class(cfg)(genome, cfg)
