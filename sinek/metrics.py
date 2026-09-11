@@ -33,9 +33,21 @@ BASE_COLUMNS = [
     "mean_speed",
     "mean_food_eaten", # ajan basina yasam boyu
     "clustering",      # komsu yakinligi (0..1) — surulesme gostergesi
-    "cooperation_rate",   # Faz 3
     "behavior_diversity", # Faz 2: genom parametrelerinin std ortalamasi
     "weight_diversity",   # Faz 2: sinir agi agirliklarinin std ortalamasi
+    # --- Faz 3: akrabalik ve isbirligi ---
+    "lineage_count",      # yasayan farkli soyisim sayisi
+    "lineage_effective",  # etkin soy sayisi (Shannon entropisinin usu)
+    "lineage_largest",    # en buyuk soyun populasyon payi
+    "share_events",       # o adimda gerceklesen paylasim
+    "share_energy",       # aktarilan enerji
+    "cooperation_rate",   # paylasim / firsat (tum firsatlar)
+    "coop_in_group",      # P(paylas | en yakin AKRABA)
+    "coop_out_group",     # P(paylas | en yakin YABANCI)
+    "kin_bias",           # ham fark: coop_in_group - coop_out_group (KONFOUNDLU)
+    "kin_bias_adj",       # enerji katmanli duzeltilmis fark  <-- guvenilen olcu
+    "opp_kin",            # ornek buyuklugu: en yakini akraba olan ajan-adim
+    "opp_nonkin",         # ornek buyuklugu: en yakini yabanci olan ajan-adim
 ]
 
 
@@ -130,10 +142,11 @@ class Metrics:
             "mean_speed": _r(speed.mean() if n else 0.0, 4),
             "mean_food_eaten": _r(eaten.mean() if n else 0.0),
             "clustering": _r(clustering_index(sim), 4),
-            "cooperation_rate": _r(sim.stats_step.get("cooperation_rate", 0.0), 4),
             "behavior_diversity": _r(behavior_diversity(agents), 5),
             "weight_diversity": _r(weight_diversity(agents), 5),
         }
+        row.update(lineage_stats(agents))
+        row.update(social_rates(sim.stats_step))
         means = genome_param_means(agents)
         for name in self.param_names:
             row[f"gp_{name}"] = _r(means.get(name, 0.0), 4)
@@ -267,6 +280,83 @@ def clustering_index(sim) -> float:
     if morisita <= 1e-9:
         return -1.0
     return float(np.clip(1.0 - 1.0 / morisita, -1.0, 1.0))
+
+
+def lineage_stats(agents) -> dict[str, float]:
+    """Soy cesitliligi.
+
+    Soy cesitliligi cokerse herkes akraba olur ve in-group/out-group ayrimi
+    anlamini yitirir — bu yuzden metrik olarak izlenmesi sart.
+    `lineage_effective` = exp(Shannon entropisi): 10 soydan 9'u tek bireyse
+    ham sayi 10 der, etkin sayi ~1 der.
+    """
+    n = len(agents)
+    if n == 0:
+        return {"lineage_count": 0, "lineage_effective": 0.0, "lineage_largest": 0.0}
+    counts: dict[int, int] = {}
+    for a in agents:
+        counts[a.genome.surname] = counts.get(a.genome.surname, 0) + 1
+    p = np.array(list(counts.values()), dtype=np.float64) / n
+    entropy = float(-(p * np.log(p)).sum())
+    return {
+        "lineage_count": len(counts),
+        "lineage_effective": round(float(np.exp(entropy)), 3),
+        "lineage_largest": round(float(p.max()), 4),
+    }
+
+
+def social_rates(stats: dict) -> dict[str, float]:
+    """Paylasim istatistiklerini AKRABALIGA KOSULLU oranlara cevirir.
+
+    Ham paylasim sayisi yaniltir: komsularinin cogu akrabaysa "akrabaya cok
+    paylastim" ayrimcilik degil, sadece firsat dagilimidir. Alici her zaman
+    en yakin komsu oldugu icin dogru olcu sudur:
+        P(paylas | en yakin akraba)  vs  P(paylas | en yakin yabanci)
+    `kin_bias` bu ikisinin farki: >0 ise akrabaya ayrimcilik yapiliyor.
+    """
+    opp_kin = float(stats.get("opp_kin", 0))
+    opp_non = float(stats.get("opp_nonkin", 0))
+    in_rate = stats.get("share_kin", 0) / opp_kin if opp_kin else 0.0
+    out_rate = stats.get("share_nonkin", 0) / opp_non if opp_non else 0.0
+    total_opp = opp_kin + opp_non
+    return {
+        "share_events": stats.get("share_events", 0),
+        "share_energy": round(float(stats.get("share_energy", 0.0)), 3),
+        "cooperation_rate": round(stats.get("share_events", 0) / total_opp, 5) if total_opp else 0.0,
+        "coop_in_group": round(in_rate, 5),
+        "coop_out_group": round(out_rate, 5),
+        "kin_bias": round(in_rate - out_rate, 5),
+        "kin_bias_adj": round(stratified_kin_bias(stats), 5),
+        "opp_kin": int(opp_kin),
+        "opp_nonkin": int(opp_non),
+    }
+
+
+def stratified_kin_bias(stats: dict, buckets: int = 5) -> float:
+    """Verici enerjisine gore katmanlanmis akrabalik ayrimciligi.
+
+    NEDEN GEREKLI: akrabalar uzamsal olarak kumelenir, kumeler zengin yemek
+    yamalarindadir, oradaki sinekler daha toktur ve paylasacak BUTCESI olan
+    ancak tok sinektir. Bu yuzden "en yakini akraba olanlar daha cok paylasti"
+    sonucu, hicbir ayrimcilik olmadan da cikar.
+
+    Olculdu: akrabalik sensorunu OKUYAMAYAN refleks beyinle bile ham fark
+    +3.8 puan cikiyor. Ham `kin_bias` bu yuzden tek basina kanit degildir.
+
+    Bu fonksiyon karsilastirmayi AYNI enerji katmani icinde yapar ve
+    Mantel-Haenszel agirligiyla birlestirir. Katmanlar disi enerji farki
+    boylece notrlenir.
+    """
+    num = den = 0.0
+    for b in range(buckets):
+        ok = float(stats.get(f"opp_kin_{b}", 0))
+        on = float(stats.get(f"opp_non_{b}", 0))
+        if ok <= 0 or on <= 0:
+            continue
+        w = ok * on / (ok + on)
+        num += w * (stats.get(f"shr_kin_{b}", 0) / ok - stats.get(f"shr_non_{b}", 0) / on)
+        den += w
+    return num / den if den else 0.0
 
 
 def genome_param_means(agents) -> dict[str, float]:

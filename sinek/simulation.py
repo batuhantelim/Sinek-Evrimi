@@ -32,14 +32,24 @@ import math
 
 import numpy as np
 
-from .agent import Agent
+from .agent import M, Agent
 from .brains import make_brain
 from .genome import Genome, founder_genome
-from .metrics import behavior_diversity, genome_param_means, weight_diversity
+from .physics import Physics
+from .metrics import (
+    behavior_diversity,
+    genome_param_means,
+    lineage_stats,
+    social_rates,
+    weight_diversity,
+)
 from .spatial import SpatialHash
 from .world import World
 
 DEATH_KEYS = {"starved": "death_starved", "hazard": "death_hazard", "old_age": "death_old_age"}
+
+#: Paylasim istatistiklerinin ayrildigi verici-enerjisi katmani sayisi.
+ENERGY_BUCKETS = 5
 
 
 class Simulation:
@@ -48,12 +58,21 @@ class Simulation:
         self.seed = int(cfg.seed if seed is None else seed)
         self.rng = np.random.default_rng(self.seed)
 
+        self.physics = Physics.from_config(cfg)
         self.world = World(cfg, self.rng)
+        # Hash hucresi SORGU yaricapina gore boyutlandirilir. Faz 3'te sorgu
+        # yaricapi akrabalik menzili (~2.5); komsuluk yaricapiyla (~8)
+        # boyutlandirmak her sorguyu 15x pahali hale getiriyordu.
+        social_on = bool(cfg.get("rules.share.enabled", False)) or bool(
+            cfg.get("rules.attack.enabled", False)
+        )
+        hash_cell = (
+            float(cfg.get("rules.kinship.radius", 2.5))
+            if social_on
+            else float(cfg.agents.senses.neighbor_radius)
+        )
         self.hash = SpatialHash(
-            self.world.width,
-            self.world.height,
-            float(cfg.agents.senses.neighbor_radius),
-            self.world.toroidal,
+            self.world.width, self.world.height, max(0.5, hash_cell), self.world.toroidal
         )
 
         self.step_index = 0
@@ -71,6 +90,16 @@ class Simulation:
         # yoksa iki secilim mekanizmasi birbirine karisir.
         self._repro_enabled = bool(cfg.agents.reproduction.enabled) and self.mode != "generational"
 
+        # --- Faz 3: sosyal kurallar ---
+        self._share_on = bool(cfg.get("rules.share.enabled", False))
+        self._attack_on = bool(cfg.get("rules.attack.enabled", False))
+        self._social_enabled = self._share_on or self._attack_on
+        self.kin_radius = float(cfg.get("rules.kinship.radius", 2.5))
+        self.kin_control = str(cfg.get("rules.kinship.control", "none"))
+        self.split_rate = float(cfg.get("rules.kinship.split_rate", 0.0))
+        if self.kin_control not in ("none", "shuffle_surnames", "random_surname_at_birth", "scatter_offspring"):
+            raise ValueError(f"bilinmeyen rules.kinship.control={self.kin_control!r}")
+
         self.founder = founder_genome(cfg, self.rng)
         n0 = int(cfg.agents.initial_count)
         if initial_genomes:
@@ -82,17 +111,23 @@ class Simulation:
             self.agents = [
                 self._spawn(self.founder.diversified(cfg, self.rng, spread)) for _ in range(n0)
             ]
+        # Her kurucuya benzersiz soyisim; yavrular miras alir (genome.copy).
+        # Tohumlanmis genomlar da yeniden isimlendirilir: kayittaki soyisimler
+        # baska bir kosumun soyagacina aitti.
+        self._next_surname = len(self.agents)
+        for i, a in enumerate(self.agents):
+            a.genome.surname = i
 
         self.generation = 0
+        self.epoch_length = max(1, int(cfg.get("evolution.epoch_length", 500)))
         self.graveyard: list[Agent] = []  # bu neslin oluleri (secilim havuzunda kalirlar)
         self.generation_rows: list[dict] = []
+        self._epoch_acc: dict = {}
+        self.share_events: list[tuple] = []  # gorsellestirme icin (x1,y1,x2,y2,kin)
         self.stats_step = _empty_stats()
         self.stats_total = _empty_stats()
         self.extinct_at: int | None = None
         self.last_metrics: dict | None = None  # HUD ve loglama icin son metrik satiri
-        self._social_enabled = bool(cfg.get("rules.share.enabled", False)) or bool(
-            cfg.get("rules.attack.enabled", False)
-        )
 
     # ------------------------------------------------------------- kurulum
     def _spawn(self, genome: Genome, x=None, y=None, energy=None) -> Agent:
@@ -138,17 +173,28 @@ class Simulation:
             np.fromiter((a.y for a in self.agents), dtype=np.float32, count=len(self.agents)),
         )
         if self._social_enabled:
-            self.hash.build(self.agents)  # Faz 3 ikili etkilesimler icin
+            # Faz 3: akrabalik sensoru ve paylasim ayni "en yakin komsu"yu
+            # kullanir; bir kez hesaplanip onbellege alinir.
+            self.hash.build(self.agents)
+            if self.kin_control == "shuffle_surnames":
+                self._shuffle_surnames()
+            for a in self.agents:
+                a.nearest = self.hash.nearest(a, self.kin_radius, self.world)
 
         # 3) algi -> karar -> eylem
+        phys = self.physics
+        rng = self.rng
+        inv_energy_per_unit = 1.0 / phys.energy_per_unit
         for a in self.agents:
-            sensors = a.sense(self.world, cfg)
-            motors = a.brain.act(sensors, self.rng)
-            gained = a.apply_motors(motors, self.world, cfg)
-            self.stats_step["food_eaten"] += gained / float(cfg.world.food.energy_per_unit)
+            gained = a.apply_motors(a.brain.act(a.sense(self.world, phys), rng), self.world, phys)
+            self.stats_step["food_eaten"] += gained * inv_energy_per_unit
+
+        # 3.5) sosyal kurallar — olumlerden ONCE: bir paylasim olmak uzere
+        #      olan bir sinegi gercekten kurtarabilmeli.
+        self._apply_social_rules()
 
         # 4) cevre etkileri
-        metabolism = float(cfg.agents.energy.metabolism)
+        metabolism = phys.metabolism
         for a in self.agents:
             dmg = self.world.hazard_damage_at(a.x, a.y)
             if dmg > 0.0:
@@ -174,18 +220,21 @@ class Simulation:
         if self._repro_enabled:
             self._reproduce()
 
-        # 7) sosyal kurallar (Faz 3 kancasi)
-        self._apply_social_rules()
-
         for k, v in self.stats_step.items():
             self.stats_total[k] += v
 
         if not self.agents and self.extinct_at is None:
             self.extinct_at = self.step_index
 
-        # 8) nesil siniri
-        if self.mode == "generational" and self.step_index % self.generation_length == 0:
-            self._next_generation()
+        for k, v in self.stats_step.items():
+            self._epoch_acc[k] = self._epoch_acc.get(k, 0) + v
+
+        # 8) periyodik evrim raporu
+        if self.mode == "generational":
+            if self.step_index % self.generation_length == 0:
+                self._next_generation()
+        elif self.step_index % self.epoch_length == 0:
+            self._record_epoch()
 
     def _kill(self, a: Agent, cause: str) -> None:
         a.alive = False
@@ -219,8 +268,34 @@ class Simulation:
                 a.energy += child_energy + cost  # bolunme bedelini kaldiramaz
                 continue
             ang = float(self.rng.uniform(0, 2 * math.pi))
-            cx, cy = self.world.move(a.x, a.y, math.cos(ang) * radius, math.sin(ang) * radius)
-            child = self._spawn(a.genome.child(cfg, self.rng), cx, cy, child_energy)
+            if self.kin_control == "scatter_offspring":
+                # KONTROL: yavru ebeveynin yaninda degil, haritada rastgele
+                # dogar -> akrabalarin uzamsal kumelenmesi bozulur.
+                cx, cy = self.world.random_position(self.rng)
+            else:
+                cx, cy = self.world.move(
+                    a.x, a.y, math.cos(ang) * radius, math.sin(ang) * radius
+                )
+            genome = a.genome.child(cfg, self.rng)
+            if self.kin_control == "random_surname_at_birth":
+                # KONTROL: etiket birey icin sabit ama KALITSAL DEGIL.
+                # Etiket YASAYAN populasyondan cekilir (0..N araligindan degil):
+                # boylece soy buyukluklerinin dagilimi ve dolayisiyla akrabayla
+                # karsilasma SIKLIGI asil kosumdakine benzer kalir. Duz rastgele
+                # cekim herkesi yabanci yapar, opp_kin ornegi cok kucuk kalir ve
+                # in-group orani olculemeyecek kadar gurultulu olur.
+                donor = self.agents[int(self.rng.integers(0, len(self.agents)))]
+                genome.surname = donor.genome.surname
+            elif self.split_rate > 0.0 and self.rng.random() < self.split_rate:
+                # Soy bolunmesi: nadiren yeni bir soyisim dogar.
+                # Soylar suruklenmeyle tukendigi icin (kurucu sayisi sadece
+                # azalabilir) etiket cesitliligi bu olmadan sifira gider ve
+                # in-group/out-group ayrimi anlamsizlasir. Genomu degistirmez,
+                # yalnizca soyagaci etiketini yeniler; kontrol grubuna da
+                # BIREBIR ayni oranda uygulanir.
+                genome.surname = self._next_surname
+                self._next_surname += 1
+            child = self._spawn(genome, cx, cy, child_energy)
             child.parent_id = a.id
             a.children += 1
             newborns.append(child)
@@ -289,20 +364,125 @@ class Simulation:
             "behavior_diversity": round(behavior_diversity(pool), 5),
             "weight_diversity": round(weight_diversity(pool), 5),
         }
+        row.update(lineage_stats(self.agents))
+        acc = self._epoch_acc if self.mode != "generational" else self.stats_total
+        row.update(social_rates(acc))
+        # Ornek buyuklukleri satirda dursun: kucuk opp_kin ile hesaplanan bir
+        # in-group orani gurultudur, okuyan bunu gorebilmeli.
+        for key in ("opp_kin", "opp_nonkin", "share_kin", "share_nonkin"):
+            row[key] = int(acc.get(key, 0))
         for name, value in genome_param_means(pool).items():
             row[f"gp_{name}"] = round(value, 4)
         return row
 
+    # --------------------------------------------------------------- Faz 3
     def _apply_social_rules(self) -> None:
-        """Faz 3: paylasma / saldiri. Config'te kapaliysa hicbir sey yapmaz."""
-        cfg = self.cfg
-        if not self._social_enabled:
+        """Paylasma (ve ileride saldiri). Config'te kapaliysa hicbir sey yapmaz.
+
+        PAYLASIM ASLA DOGRUDAN ODULLENDIRILMEZ. `evolution.fitness` icinde
+        "paylastin diye +puan" YOKTUR ve olmamalidir. Verenin NET kaybi vardir
+        (aktarilan enerji + islem maliyeti). Paylasmanin kârli olmasinin tek
+        yolu DOLAYLIdir: akrabaya yardim = ortak genin hayatta kalmasi.
+
+        Alici her zaman EN YAKIN komsudur — yani "kime" degil "verecek miyim"
+        karari evrimlesir. Akrabalik sensoru de ayni komsuyu bildirdigi icin
+        ayrimcilik dogrudan olculebilir:
+            P(paylas | en yakin akraba)  vs  P(paylas | en yakin yabanci)
+
+        Transferler id sirasinda ve ardisik uygulanir (simulasyonun geri
+        kalaniyla ayni konvansiyon) — deterministik.
+        """
+        if self._attack_on:
+            raise NotImplementedError(
+                "rules.attack Faz 3 adim 2'de uygulanacak (once share onaylanmali)."
+            )
+        self.share_events.clear()
+        if not self._share_on:
             return
-        # Faz 3'te doldurulacak: motors["social"] isaretine gore enerji transferi.
-        # Iskelet burada duruyor ki kural motoru simulasyon dongusune bagli kalsin.
-        raise NotImplementedError(
-            "Sosyal kurallar Faz 3'te uygulanacak (rules.share / rules.attack)."
-        )
+
+        cfg = self.cfg
+        sh = cfg.rules.share
+        threshold = float(sh.threshold)
+        amount_max = float(sh.amount)
+        overhead = float(sh.overhead)
+        floor = float(sh.min_donor_energy)
+        radius2 = self.kin_radius * self.kin_radius
+        e_max = self.physics.energy_max
+        stats = self.stats_step
+
+        for a in self.agents:
+            other = a.nearest
+            if other is None or not other.alive:
+                continue
+            dx, dy = self.world.delta(a.x, a.y, other.x, other.y)
+            if dx * dx + dy * dy > radius2:
+                continue  # hareket ettiler, artik menzilde degil
+
+            kin = other.genome.surname == a.genome.surname
+            stats["opp_kin" if kin else "opp_nonkin"] += 1
+            # Enerji katmani: akrabalar uzamsal kumelendigi icin "en yakini
+            # akraba" olmak, zengin bir yamada olmakla — yani paylasacak
+            # BUTCEYE sahip olmakla — karisir. Katman icinde karsilastirma
+            # bu konfoundu notrler (bkz. metrics.social_rates).
+            bucket = min(ENERGY_BUCKETS - 1, int(a.energy / e_max * ENERGY_BUCKETS))
+            stats[f"{'opp_kin' if kin else 'opp_non'}_{bucket}"] += 1
+
+            urge = float(a.last_motors[M["share"]])
+            if urge < threshold:
+                continue
+
+            # Verenin net maliyeti: aktarilan + islem. Kendini oldurecek
+            # kadarini veremez; taban enerjinin altina inmez.
+            budget = a.energy - floor - overhead
+            if budget <= 0.0:
+                continue
+            amount = min(urge * amount_max, budget)
+            if amount <= 0.0:
+                continue
+
+            a.energy -= amount + overhead
+            a.given += amount  # aktarilan enerji (islem maliyeti kimseye gitmez)
+            a.shares_made += 1
+            # Alici tavanini asamaz; asan kisim BOSA GIDER (azalan verim —
+            # tok bir sinege vermek israf, ac olana vermek hayat kurtarir)
+            taken = min(amount, e_max - other.energy)
+            if taken > 0.0:
+                other.energy += taken
+                other.received += taken
+
+            stats["share_events"] += 1
+            stats["share_energy"] += amount
+            stats["share_kin" if kin else "share_nonkin"] += 1
+            stats[f"{'shr_kin' if kin else 'shr_non'}_{bucket}"] += 1
+            self.share_events.append((a.x, a.y, other.x, other.y, kin))
+
+    def _shuffle_surnames(self) -> None:
+        """KONTROL: soyisimleri yasayanlar arasinda karistirir.
+
+        Etiket ile gercek akrabalik arasindaki bagi koparir; akrabalik
+        sensoru saf gurultuye doner. Bu kontrolde isbirligi evrimlesmemeli.
+        """
+        if len(self.agents) < 2:
+            return
+        names = [a.genome.surname for a in self.agents]
+        order = self.rng.permutation(len(names))
+        for a, idx in zip(self.agents, order):
+            a.genome.surname = names[int(idx)]
+
+    def _record_epoch(self) -> None:
+        """steady_state modunda periyodik evrim raporu.
+
+        Nesil siniri olmadigi icin "nesil" yerine sabit uzunlukta ZAMAN DILIMI
+        raporlanir; generations.csv semasi ayni kalir, grafik araclari bozulmaz.
+        """
+        if not self.agents:
+            return
+        fits = np.array([a.fitness(self.fitness_weights) for a in self.agents], dtype=np.float64)
+        order = np.argsort(-fits, kind="stable")
+        row = self._generation_row(self.agents, fits, order)
+        self.generation += 1
+        self._epoch_acc = {}
+        self.generation_rows.append(row)
 
     # ---------------------------------------------------------------- kosum
     def run(self, steps: int, on_step=None) -> None:
@@ -348,5 +528,16 @@ def _empty_stats() -> dict:
         "death_hazard": 0,
         "death_old_age": 0,
         "food_eaten": 0.0,
-        "cooperation_rate": 0.0,
+        # --- Faz 3 ---
+        "share_events": 0,      # gerceklesen paylasim sayisi
+        "share_energy": 0.0,    # aktarilan toplam enerji
+        "opp_kin": 0,           # en yakin komsusu AKRABA olan ajan-adim sayisi
+        "opp_nonkin": 0,        # en yakin komsusu YABANCI olan ajan-adim sayisi
+        "share_kin": 0,         # bunlarin kacinda paylasildi
+        "share_nonkin": 0,
+        # Enerji katmanli sayimlar (konfound duzeltmesi icin)
+        **{f"opp_kin_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"opp_non_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"shr_kin_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"shr_non_{b}": 0 for b in range(ENERGY_BUCKETS)},
     }

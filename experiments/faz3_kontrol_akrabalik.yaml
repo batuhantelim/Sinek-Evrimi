@@ -1,0 +1,15 @@
+# FAZ 3 ASIL KONTROL: soyisim KALITSAL DEGIL.
+#
+# Yavru, ebeveyninin soyismi yerine rastgele bir soyisim alir. Etiket birey
+# icin sabittir (davranis tutarli kalir) ama gercek akrabalik hakkinda HICBIR
+# sey soylemez. Dolayisiyla "akrabaya paylas" stratejisinin dolayli getirisi
+# yok olur.
+#
+# Beklenti: asil kosumda kin_bias yukselirse ve burada DUZ kalirsa, bulgu
+# gercektir. Burada da yukseliyorsa gordugumuz sey akrabalik secilimi degil.
+#   python run.py --config experiments/faz3_kontrol_akrabalik.yaml
+run:
+  name: faz3_kontrol_akrabalik
+rules:
+  kinship:
+    control: random_surname_at_birth

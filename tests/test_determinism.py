@@ -14,9 +14,12 @@ BASE = ["viz.mode=none", "metrics.enabled=false", "agents.initial_count=40"]
 # Faz 1 (refleks + klon) ve Faz 2 (rnn + mutasyon + nesil dongusu) ayri ayri
 # sinanir: mutasyon ve secilim de rastgelelik tuketir, akis bozulursa hash kacar.
 PHASE1 = ["brain.type=reflex", "evolution.enabled=false", "evolution.mode=steady_state",
-          "evolution.founder_spread=0.0"]
+          "evolution.founder_spread=0.0", "rules.share.enabled=false"]
 PHASE2 = ["brain.type=rnn", "evolution.enabled=true", "evolution.mode=generational",
-          "evolution.generation_length=40", "evolution.founder_spread=1.0"]
+          "evolution.generation_length=40", "evolution.founder_spread=1.0",
+          "rules.share.enabled=false"]
+PHASE3 = ["brain.type=rnn", "evolution.enabled=true", "evolution.mode=steady_state",
+          "rules.share.enabled=true"]
 
 
 def run(steps=120, phase=PHASE2, **over):
@@ -37,6 +40,12 @@ class TestDeterminism(unittest.TestCase):
         a, b = run(), run()
         self.assertEqual(a.state_hash(), b.state_hash())
         self.assertGreaterEqual(a.generation, 2, "test nesil sinirini asmali")
+
+    def test_same_seed_same_state_phase3(self):
+        """Paylasim transferleri de deterministik sirada uygulanmali."""
+        a, b = run(phase=PHASE3), run(phase=PHASE3)
+        self.assertEqual(a.state_hash(), b.state_hash())
+        self.assertGreater(a.stats_total["share_events"], 0, "hic paylasim olmadi, test bos")
 
     def test_different_seed_diverges(self):
         a, b = run(seed=1), run(seed=2)

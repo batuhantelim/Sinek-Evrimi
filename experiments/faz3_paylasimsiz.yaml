@@ -1,0 +1,9 @@
+# FAZ 3 TABAN CIZGISI: paylasim mekanigi tamamen kapali.
+# Ayni ekolojide "hic paylasim olmasaydi" referansi — populasyon, enerji ve
+# soy cesitliligi karsilastirmasi icin.
+#   python run.py --config experiments/faz3_paylasimsiz.yaml
+run:
+  name: faz3_paylasimsiz
+rules:
+  share:
+    enabled: false

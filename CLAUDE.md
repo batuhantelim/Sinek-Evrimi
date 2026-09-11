@@ -30,9 +30,10 @@ davranış oradan **türer**.
 |---|---|---|
 | **Faz 1** | Tek tip (klon) ajan + ortam + hareket + yemek + üreme/ölüm | ✅ tamam |
 | **Faz 2** | Mutasyon + seçilim + evrimleşebilir recurrent sinir ağı | ✅ **tamam** |
-| **Faz 3** | Sosyal kurallar: paylaşma / saldırma, işbirliğinin evrimi | ⏳ iskelet hazır |
+| **Faz 3 — adım 1** | Soyisim + akrabalık sensörü + paylaşma + kontrol grupları | ✅ **tamam** |
+| **Faz 3 — adım 2** | `attack`, tam in/out-group düşmanlık analizi | ⏳ onay bekliyor |
 
-`config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 2).
+`config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 3).
 Önceki fazlar `experiments/` altındaki hazır konfigürasyonlarla tek komutta
 yeniden üretilir.
 
@@ -53,7 +54,8 @@ sinek/
     base.py             Brain arayüzü + kayıt defteri (registry)
     reflex.py           Faz 1 beyni: genomdan gelen ağırlıklı refleks devresi
     rnn.py              Faz 2 beyni: küçük evrimleşebilir recurrent ağ
-  genome.py             Genom (params + weights) + gaussian mutasyon
+  genome.py             Genom (params + weights + soyisim) + gaussian mutasyon
+  physics.py            Sıcak yol için dondurulmuş fizik sabitleri
   spatial.py            Uzamsal hash (Faz 3 ikili etkileşimleri için)
   persistence.py        Popülasyonu npz olarak kaydet/yükle
   simulation.py         Adım döngüsü + nesil döngüsü + seçilim
@@ -64,6 +66,7 @@ sinek/
   font3x5.py            HUD yazısı için minik bitmap font
 tools/plot_metrics.py   metrics.csv / generations.csv → PNG grafik
 tools/benchmark_genomes.py  Evrimleşmiş koloni vs acemi koloni, aynı dünyada
+tools/kin_probe.py      Akrabalık sensörü sondası: beyin akrabalığı okuyor mu?
 tests/                  unittest — determinizm + Faz 1 + Faz 2 testleri
 ```
 
@@ -78,9 +81,19 @@ sensors (13 float) ──► Brain.act() ──► motors (4 float)
 ```python
 SENSOR_NAMES = [bias, energy, age, food_here, food_fwd, food_left,
                 food_strength, hazard_fwd, hazard_left, hazard_near,
-                mate_fwd, mate_left, crowd]
-MOTOR_NAMES  = [turn, thrust, eat, social]
+                mate_fwd, mate_left, crowd,
+                kin, near_agent]                    # Faz 3
+MOTOR_NAMES  = [turn, thrust, eat, share]           # share: Faz 3
 ```
+
+`kin` ve `near_agent` **ayrı** kanallardır. Tek kanalda `{-1, 0, +1}` ile
+"akraba mı" ile "menzilde biri var mı" ayrılamaz; o kanala düşen ağırlık
+yorumlanamaz hale gelir. Bu ayrımı ilk sürümde yapmamıştım ve sonda
+(`tools/kin_probe.py`) ölçümü kirletiyordu.
+
+Sözleşme büyüdüğünde eski genomlar kaybolmaz: `persistence.migrate_weights`
+yeni sensör sütunlarını ve motor satırlarını **sıfırla** ekler — ağ yeni girdiyi
+başta görmez, davranış birebir korunur, mutasyon zamanla bağlantıyı açar.
 
 Yön sensörleri **egosentrik**: `_fwd` = sineğin baktığı yön bileşeni,
 `_left` = sol bileşeni. Beyin mutlak koordinat bilmeden çalışır — evrimleşebilir
@@ -165,6 +178,15 @@ mekanizması aynı anda çalışırsa hangisinin ne yaptığı ölçülemez.
 Seçilim havuzuna **ölenler de dahildir**. Dışarıda bırakılırsa "erken ölen hiç
 yarışmamış" sayılır ve seçilim ciddi biçimde çarpıtılır.
 
+### Sıcak yol: `Physics`
+
+`Agent.sense` ve `apply_motors` ajan × adım başına çağrılır. Config ağacını
+orada dolaşmak (`cfg.agents.motors.max_turn`) adım başına milyonlarca
+`Cfg.__getattr__` üretiyordu — profilde sürenin ~%40'ı. `sinek/physics.py`
+config'i kurulumda bir kez düz alanlara açar; skaler `np.clip` de `min/max`
+ile değiştirildi. Sonuç: 52 → 23 ms/adım. **Bu fonksiyonlara `cfg` değil
+`sim.physics` geçilir.**
+
 ### Fitness = deneyin asıl düğmesi
 
 ```yaml
@@ -195,6 +217,85 @@ Aradaki değerler doğrusal geçiş yapar
 Parametreler ve ağırlıklar **ayrı oranlarla** mutasyona uğrar
 (`mutation_rate` vs `weight_mutation_rate`). Ağırlıklar 364 adet olduğu için
 aynı oran kullanılırsa her doğum ağı darmadağın eder.
+
+---
+
+## 3.5 Faz 3: akrabalık ve işbirliği
+
+### Üç kural (ihlali deneyi geçersiz kılar)
+
+1. **Rol/kast kodlanmaz.** Koşullar kurulur, iş bölümü çıkarsa çıkar.
+   `tests/test_phase3.py::test_no_caste_is_hardcoded` kaynakta
+   "queen/worker/caste" geçmediğini denetler.
+2. **Paylaşım ödüllendirilmez.** `evolution.fitness` içinde paylaşım terimi
+   **yoktur**; `Agent.fitness` `given`/`received`/`shares_made` alanlarına
+   bakmaz. Test bunu hem config'te hem kodda doğrular. Verenin **net** kaybı
+   vardır (aktarılan enerji + `overhead`). Kâr yalnızca dolaylı olabilir.
+3. **İşbirliği in-group / out-group ayrı ölçülür.** İttifak kural olarak
+   atanmaz; sadece oranlar raporlanır.
+
+### Mekanik
+
+- **Soyisim** (`Genome.surname`): her kurucuya benzersiz, yavru miras alır.
+  Sadece soyağacı etiketi — *aynı soyisim genetik özdeşlik değildir*, mutasyon
+  zamanla ayırır.
+- **`share` motoru**: eşiği aşarsa **en yakın** komşuya enerji aktarır.
+  Alıcı hep en yakın komşu olduğu için karar "kime" değil "verecek miyim"dir;
+  akrabalık sensörü de aynı komşuyu bildirir, böylece ayrımcılık doğrudan
+  ölçülebilir: `P(paylaş | en yakın akraba)` vs `P(paylaş | en yakın yabancı)`.
+- Alıcı `energy.max`'ı aşamaz, aşan kısım **boşa gider** — azalan verim,
+  altruizmin evrimleşebilmesi için gereken temel.
+- Transferler id sırasında ardışık uygulanır (deterministik).
+
+### Kontrol grupları (`rules.kinship.control`)
+
+| Değer | Ne bozar |
+|---|---|
+| `none` | — (asıl koşum) |
+| `random_surname_at_birth` | Etiket **kalıtsal değil**: yavru, yaşayan popülasyondan rastgele bir soyisim alır. Grup büyüklüğü dağılımı korunur, akrabalık bilgisi gider |
+| `shuffle_surnames` | Her adım yaşayanlar arasında permütasyon — etiket tanımı gereği bilgisiz. En sert kontrol |
+| `scatter_offspring` | Yavru haritaya rastgele doğar: akrabalık bilgisi durur, uzamsal fırsat gider |
+
+`random_surname_at_birth` ilk sürümde `randint(0, N)` çekiyordu; bu neredeyse
+herkesi yabancı yapıp `opp_kin` örneğini yok ediyordu ve kontrolün in-group
+oranı ölçülemeyecek kadar gürültülü çıkıyordu. Artık **yaşayan popülasyondan**
+çekiliyor.
+
+### Soy çeşitliliği ve `split_rate`
+
+Soylar yalnızca tükenebilir (yeni kurucu yoktur), boom–bust darboğazları da
+sert: 160×100 dünyada 200 kurucu 6000 adımda **3 etkin soya** düşüyordu.
+Herkes akraba olunca in/out ayrımı anlamını yitirir. İki önlem:
+
+- **Daha geniş dünya** (240×150, 24 yama): soylara yerel sığınak bırakır,
+  aynı adımda ~13 etkin soy. Faz 1/2'den farklı olmasının sebebi budur.
+- **`rules.kinship.split_rate`**: yavrunun soyismi küçük bir olasılıkla yeni
+  olur. Yeni bölünen soy, bölündüğü anda ebeveyniyle genetik olarak aynıdır —
+  yani etiket akrabalığı **eksik** bildirir. Bu, hipotez lehine değil
+  **aleyhine** çalışır; pozitif bulguyu şişiremez, ancak zayıflatır.
+
+Her koşumda `lineage_effective` ve `opp_kin` izlenmelidir: örneklem küçülürse
+oran gürültüdür.
+
+### ⚠ `kin_bias` tek başına kanıt değildir
+
+Akrabalar uzamsal kümelenir → kümeler zengin yamalardadır → oradaki sinekler
+toktur → **paylaşacak bütçesi olan tok sinektir**. Yani "akrabaya daha çok
+paylaşıldı" sonucu hiçbir ayrımcılık olmadan da çıkar.
+
+Ölçüldü: akrabalık sensörünü **okuyamayan** refleks beyinle (ayrımcılık
+matematiksel olarak imkânsız) ham `kin_bias` **+3.80 puan** çıkıyor.
+
+İki düzeltme:
+
+1. **`kin_bias_adj`** — verici enerjisine göre 5 katmana ayırıp
+   Mantel–Haenszel ağırlığıyla birleştirir. Aynı yapay kurulumda +3.80 → +0.36.
+2. **`tools/kin_probe.py`** — ajanları hiç çalıştırmaz. Aynı sensör vektörünü
+   beyne iki kez verir, **sadece** akrabalık kanalını değiştirir ve paylaşım
+   motorundaki farkı ölçer. Uzamsal etki, enerji, yoğunluk sabit; kalan fark
+   saf ayrımcılıktır.
+
+**Her ikisi de mutlak değil, eşleşmiş bir kontrol koşumuna karşı okunur.**
 
 ---
 
@@ -280,6 +381,13 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `clustering` | Morisita benzeri kümelenme: `>0` sürüleşme, `<0` kaçınma |
 | `behavior_diversity` | genom **parametrelerinin** ort. std sapması |
 | `weight_diversity` | sinir ağı **ağırlıklarının** ort. std sapması |
+| `lineage_count / _effective / _largest` | soy çeşitliliği (etkin sayı = Shannon entropisinin üssü) |
+| `share_events`, `share_energy` | paylaşım sayısı ve aktarılan enerji |
+| `cooperation_rate` | paylaşım / fırsat |
+| `coop_in_group`, `coop_out_group` | `P(paylaş \| akraba)`, `P(paylaş \| yabancı)` |
+| `kin_bias` | ham fark — **konfoundlu**, tek başına kullanmayın |
+| `kin_bias_adj` | enerji katmanlı düzeltilmiş fark — güvenilen ölçü |
+| `opp_kin`, `opp_nonkin` | örneklem büyüklükleri (küçükse oran gürültüdür) |
 | `gp_<parametre>` | her genom parametresinin popülasyon ortalaması — evrimin **yönü** |
 | `cooperation_rate` | Faz 3 için ayrılmış |
 
@@ -329,7 +437,33 @@ Tam tablo ve görseller: **[docs/faz2/](docs/faz2/)**
   Diğer 9 parametreyi `rnn` okumadığı için onlar nötr sürüklenme referansıdır;
   `summary.txt` ikisini ayrı raporlar.
 
+### Faz 3 adım 1 (seed 42, 12000 adım = 24 dönem)
+
+Tam tablo ve görseller: **[docs/faz3/](docs/faz3/)**
+
+- **Paylaşma seçilimle elendi.** Paylaşım oranı %28.2 → %1.0. Beklenen:
+  net maliyeti var, fitness'ta karşılığı yok, dolaylı getirisi maliyeti
+  karşılamıyor.
+- **Akrabalığa yönelik fedakârlık EVRİMLEŞMEDİ.** Ham `kin_bias` +0.37 puan
+  (12/12 dönem pozitif) — ama soyisimlerin her adım karıştırıldığı, yani
+  etiketin tanımı gereği bilgisiz olduğu kontrolde **+0.63**. Nedensel sonda
+  aynı sonucu veriyor: asıl koşum +0.029 (%53.8 akrabayı kayırıyor), anlamsız
+  etiketli kontrol +0.104 (%82.4).
+- **Kontrolsüz okunsaydı yanlış pozitif raporlanacaktı.** Ham metrik,
+  akrabalık sensörünü okuyamayan refleks beyinle bile +3.80 puan veriyor
+  (bkz. §3.5, konfound). Faz 3 adım 2'de saldırı metrikleri de aynı
+  disiplinle okunmalı.
+- **Genom taşıması doğrulandı**: Faz 2 tohumunun sonda farkı tam olarak
+  0.000 — yeni sensör sütunu gerçekten sıfırla başlıyor.
+- Soy çeşitliliği 300 kurucu → 14 soy (etkin 4.9). Ölçüm için yeterli ama
+  daha uzun koşumlarda `lineage_effective` ve `opp_kin` izlenmeli.
+
 ### Kalibrasyon notları
+
+**Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
+`np.clip` kullanmak adım süresinin ~%60'ını yiyordu: 52 → 23 ms/adım
+(`sinek/physics.py`). Yeni bir ajan-başına-adım fonksiyonu yazarken aynı
+tuzağa düşmeyin.
 
 **`food_strength` ölçeği.** Gradyan büyüklüğü, *tam dolu bir dünyada
 erişilebilecek en dik gradyana* (`World._reference_gradient()`) bölünerek
@@ -350,19 +484,22 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
 
 ---
 
-## 7. Faz 3'e geçerken yapılacaklar
+## 7. Faz 3 adım 2'ye geçerken yapılacaklar
 
-1. `simulation.py` → `_apply_social_rules()`: şu an bilerek
-   `NotImplementedError` atıyor. `motors["social"]` işaretine göre
-   `self.hash` üzerinden ikili enerji transferi uygulanacak
-   (uzamsal hash zaten `_social_enabled` olduğunda kuruluyor).
-2. `config.yaml` → `rules.share` / `rules.attack`: ödül, ceza, yarıçap.
-3. Metrik: `cooperation_rate` sütunu doldurulacak (paylaşma girişimi /
-   toplam sosyal eylem).
-   Faz 2'nin kazananlarıyla başlamak için:
-   `python run.py --load-genomes runs/faz2/population.npz`
-4. **Başarı ölçütü**: paylaşım ödüllendirildiğinde işbirliği oranı yükselmeli;
-   kıtlıkta saldırı payı artmalı. Kontrol grubu: aynı seed, `rules` kapalı.
+1. `MOTOR_NAMES`'in **sonuna** `attack` eklenecek (mevcut indeksler kaymasın).
+   Genom boyutu değişir; `migrate_weights` yeni motor satırını sıfırla ekler,
+   yani Faz 3 adım 1'in popülasyonu kaybolmadan taşınır.
+2. `simulation._apply_social_rules()` → `rules.attack` şu an bilerek
+   `NotImplementedError` atıyor; enerji çalma + hedefe zarar oraya yazılacak.
+   Uzamsal hash ve "en yakın komşu" önbelleği zaten hazır.
+3. Metrik: `attack_in_group` / `attack_out_group` ve saldırı için de
+   **enerji katmanlı** düzeltme (`stratified_kin_bias` yeniden kullanılabilir).
+4. **Başarı ölçütü ve asıl felsefi soru**: in-group paylaşım ile out-group
+   saldırı *birlikte* mi yükseliyor? Kontrol grubu şart — Faz 3 adım 1'de
+   ham metrik kontrolsüz okunsaydı yanlış bir "akrabalık seçilimi bulundu"
+   sonucu raporlanacaktı.
+5. Faz 3 adım 1'in kazananlarıyla başlamak için:
+   `python run.py --load-genomes runs/faz3/population.npz`
 
 ---
 
@@ -382,6 +519,13 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
   `genome.params`'tan gelir; yenisini eklerken `config.yaml → genome.params`
   **ve** `evolution.param_bounds`'a da ekle.
 - **`Agent.fitness` bir metottur**, property değil: `a.fitness(sim.fitness_weights)`.
+- **`sense` / `apply_motors` `cfg` değil `Physics` alır** (`sim.physics`).
+  Sıcak yolda config ağacı dolaşılmaz.
+- **Fitness'a asla sosyal terim eklenmez.** `given`, `received`, `shares_made`
+  yalnızca ölçüm içindir. Ödüllendirilirse işbirliği bulgusu değersizleşir;
+  `test_fitness_has_no_sharing_term` bunu bekler.
+- **Grup-içi/grup-dışı oranlar kontrol koşumuna karşı okunur**, sıfıra karşı
+  değil. Ham `kin_bias` uzamsal kümelenme yüzünden konfoundludur.
 - **Testler kendi fazlarını sabitler.** `tests/test_phase1.py` refleks + mutasyon
   kapalı override'ları ile başlar; `config.yaml` varsayılanı ilerlese de Faz 1
   testleri Faz 1'i ölçmeye devam eder.

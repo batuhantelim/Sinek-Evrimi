@@ -27,6 +27,13 @@ SENSOR_NAMES: list[str] = [
     "mate_fwd",         # 10 komsu yonu, ileri              (-1..1)
     "mate_left",        # 11 komsu yonu, sol                (-1..1)
     "crowd",            # 12 komsu yogunlugu                (0..1)
+    # --- Faz 3 ---
+    "kin",              # 13 en yakin ajanin akrabaligi: +1 akraba, -1 yabanci,
+                        #    0 menzilde kimse yok
+    "near_agent",       # 14 menzilde ajan var mi (0/1)
+                        #    AYRI kanal olmasi sart: tek kanalda {-1,0,+1} ile
+                        #    "akraba mi" ile "biri var mi" ayrilamaz, agirligi
+                        #    yorumlanamaz hale gelir.
 ]
 N_SENSORS = len(SENSOR_NAMES)
 
@@ -35,7 +42,8 @@ MOTOR_NAMES: list[str] = [
     "turn",     # -1..1  yon degisimi (x max_turn radyan)
     "thrust",   #  0..1  ileri hiz    (x max_speed hucre)
     "eat",      #  0..1  yeme istegi
-    "social",   # -1..1  Faz 3: >0 paylas, <0 saldir (Faz 1'de yok sayilir)
+    "share",    #  0..1  Faz 3: en yakin ajana enerji aktarma istegi
+    # Faz 3 adim 2'de "attack" buraya, SONA eklenecek.
 ]
 N_MOTORS = len(MOTOR_NAMES)
 
@@ -65,12 +73,18 @@ class Agent:
     distance: float = 0.0
     children: int = 0
     death_cause: str = ""
+
+    # --- Faz 3: sosyal muhasebe ---
+    given: float = 0.0        # baskalarina aktarilan enerji
+    received: float = 0.0     # baskalarindan alinan enerji
+    shares_made: int = 0
+    nearest: "Agent | None" = None   # o adimdaki en yakin komsu (adim basi onbellek)
     last_motors: np.ndarray = field(
         default_factory=lambda: np.zeros(N_MOTORS, dtype=np.float32)
     )
 
     # ------------------------------------------------------------------
-    def sense(self, world, cfg) -> np.ndarray:
+    def sense(self, world, phys) -> np.ndarray:
         """Dunyayi bencil (egosentrik) bir sensor vektorune cevirir.
 
         Tum uzamsal bilgi dunyanin onceden hesaplanmis alanlarindan O(1)
@@ -80,7 +94,7 @@ class Agent:
         cx, cy = world.cell(self.x, self.y)
 
         s[S["bias"]] = 1.0
-        s[S["energy"]] = self.energy / float(cfg.agents.energy.max)
+        s[S["energy"]] = self.energy / phys.energy_max
         s[S["age"]] = min(1.0, self.age / max(1.0, self.lifespan))
         s[S["food_here"]] = min(1.0, float(world.food[cy, cx]) / world.food_scale)
 
@@ -107,33 +121,40 @@ class Agent:
         s[S["mate_left"]] = -mx * sh + my * ch
         s[S["crowd"]] = float(world.crowd_density[cy, cx])
 
+        # --- Faz 3: en yakin ajanin akrabaligi ---
+        # Sadece ETIKET karsilastirmasi. Ajan davranisini akrabaliga gore
+        # kosullandirabilir ama zorunda degil; "akrabaya paylas" davranisi
+        # evrimlesirse evrimlesir.
+        if self.nearest is not None:
+            s[S["kin"]] = 1.0 if self.nearest.genome.surname == self.genome.surname else -1.0
+            s[S["near_agent"]] = 1.0
+
         return s
 
     # ------------------------------------------------------------------
-    def apply_motors(self, motors: np.ndarray, world, cfg) -> float:
+    def apply_motors(self, motors: np.ndarray, world, phys) -> float:
         """Motor vektorunu fizige cevirir. Yenen yemek miktarini dondurur."""
-        mot = cfg.agents.motors
-        en = cfg.agents.energy
+        # Skaler np.clip cagrisi ~6us; min/max ~0.1us. Adim basina ajan
+        # basina 3 kez cagrildigi icin fark olculebilir.
+        turn = min(1.0, max(-1.0, float(motors[M["turn"]])))
+        thrust = min(1.0, max(0.0, float(motors[M["thrust"]])))
+        eat = min(1.0, max(0.0, float(motors[M["eat"]])))
 
-        turn = float(np.clip(motors[M["turn"]], -1.0, 1.0))
-        thrust = float(np.clip(motors[M["thrust"]], 0.0, 1.0))
-        eat = float(np.clip(motors[M["eat"]], 0.0, 1.0))
-
-        self.heading = (self.heading + turn * float(mot.max_turn)) % (2.0 * math.pi)
-        speed = thrust * float(mot.max_speed)
+        self.heading = (self.heading + turn * phys.max_turn) % (2.0 * math.pi)
+        speed = thrust * phys.max_speed
         if speed > 0.0:
             self.x, self.y = world.move(
                 self.x, self.y, math.cos(self.heading) * speed, math.sin(self.heading) * speed
             )
             self.distance += speed
-            self.energy -= float(en.move_cost) * speed * speed
+            self.energy -= phys.move_cost * speed * speed
 
         gained = 0.0
         if eat > 0.0:
-            taken = world.take_food(self.x, self.y, eat * float(en.eat_rate))
+            taken = world.take_food(self.x, self.y, eat * phys.eat_rate)
             if taken > 0.0:
-                gained = taken * float(cfg.world.food.energy_per_unit)
-                self.energy = min(float(en.max), self.energy + gained)
+                gained = taken * phys.energy_per_unit
+                self.energy = min(phys.energy_max, self.energy + gained)
                 self.food_eaten += taken
 
         self.last_motors = motors

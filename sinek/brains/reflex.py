@@ -30,6 +30,7 @@ class ReflexBrain(Brain):
         self.graze_slowdown = float(p.get("graze_slowdown", 0.75))
         self.panic_speed = float(p.get("panic_speed", 0.6))
         self.hunger_speed = float(p.get("hunger_speed", 0.25))
+        self.share_urge = float(np.clip(p.get("share_urge", 0.0), 0.0, 1.0))
         self.turn_gain = float(cfg.get("brain.turn_gain", 1.5))
 
     def act(self, sensors: np.ndarray, rng: np.random.Generator) -> np.ndarray:
@@ -57,5 +58,8 @@ class ReflexBrain(Brain):
         motors[M["thrust"]] = np.clip(thrust, 0.0, 1.0)
 
         motors[M["eat"]] = 1.0 if food_here > self.eat_threshold else 0.0
-        motors[M["social"]] = 0.0  # Faz 3
+        # Refleks devre akrabalik gormez: paylasim egilimi tek bir genom
+        # parametresi, akrabaliga gore kosullanamaz. Kosullu davranis icin
+        # rnn beyni gerekir — karsilastirma noktasi tam olarak bu.
+        motors[M["share"]] = self.share_urge
         return motors

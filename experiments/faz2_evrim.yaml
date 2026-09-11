@@ -1,0 +1,19 @@
+# FAZ 2: nesilli GA, evrimlesebilir rnn, sosyal kural yok.
+# config.yaml artik Faz 3'u varsaydigi icin Faz 2 buradan uretilir.
+#   python run.py --config experiments/faz2_evrim.yaml
+run:
+  name: faz2
+  steps: 8000
+  log_every: 250
+agents:
+  initial_count: 120
+  max_count: 1200
+evolution:
+  mode: generational
+  generation_length: 250
+rules:
+  share:
+    enabled: false
+viz:
+  color_by: energy
+  every: 50

@@ -1,12 +1,21 @@
-# FAZ 1 taban cizgisi: tek tip (klon) refleks ajan, mutasyon yok.
-# Faz 2 sonuclari buna karsi okunur.
+# FAZ 1 taban cizgisi: tek tip (klon) refleks ajan, mutasyon yok, sosyal kural yok.
 #   python run.py --config experiments/faz1_klonlar.yaml
 run:
   name: faz1
   steps: 3000
+  log_every: 250
+agents:
+  initial_count: 120
+  max_count: 1200
 brain:
   type: reflex
 evolution:
   enabled: false
   mode: steady_state
   founder_spread: 0.0
+rules:
+  share:
+    enabled: false
+viz:
+  color_by: energy
+  every: 20

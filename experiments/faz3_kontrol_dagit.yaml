@@ -1,0 +1,9 @@
+# FAZ 3 KONTROL (alternatif): yavru ebeveyn yaninda degil, haritaya rastgele dogar.
+# Akrabalik bilgisi bozulmaz ama akrabalarin UZAMSAL kumelenmesi yok olur;
+# yani akrabayla karsilasma firsati kalmaz.
+#   python run.py --config experiments/faz3_kontrol_dagit.yaml
+run:
+  name: faz3_kontrol_dagit
+rules:
+  kinship:
+    control: scatter_offspring

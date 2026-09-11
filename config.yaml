@@ -1,6 +1,8 @@
 # =====================================================================
-#  Sinek Evrimi — Faz 2 varsayilan konfigurasyonu (mutasyon + secilim)
-#  Faz 1 (klonlar) icin: python run.py --config experiments/faz1_klonlar.yaml
+#  Sinek Evrimi — Faz 3 varsayilan konfigurasyonu
+#  (akrabalik + paylasma; surekli/steady-state evrim)
+#  Onceki fazlar: python run.py --config experiments/faz1_klonlar.yaml
+#                 python run.py --config experiments/faz2_evrim.yaml
 #  Bu dosya "tek dogru kaynak"tir. Kendi deneyin icin kopyalayip
 #  degistirin:  python run.py --config deneylerim/kitlik.yaml
 #  Kismi dosya da verebilirsiniz: eksik anahtarlar buradan doldurulur.
@@ -10,20 +12,26 @@
 seed: 42
 
 run:
-  name: faz2            # runs/<name>/ altina cikti yazilir
-  steps: 8000           # toplam simulasyon adimi
-  log_every: 250        # terminale ozet basma sikligi (adim)
+  name: faz3            # runs/<name>/ altina cikti yazilir
+  steps: 12000          # toplam simulasyon adimi
+  log_every: 2000       # terminale ozet basma sikligi (adim)
   stop_if_extinct: true # populasyon 0'a duserse erken bitir
 
 world:
-  width: 160            # izgara hucresi sayisi (x)
-  height: 100           # izgara hucresi sayisi (y)
+  # FAZ 3 daha genis bir dunya kullanir (Faz 1/2: 160x100).
+  # Gerekce: tek, iyi karisan bir populasyonda soylar art arda gelen
+  # boom-bust darbogazlarinda hizla tukeniyor (6000 adimda 200 -> 3 etkin soy).
+  # Daha genis ve daha cok yamali bir dunya, soylara yerel siginak birakiyor
+  # (ayni adimda 13 etkin soy) — hem olcum gucu icin hem de akrabalarin
+  # uzamsal kumelenmesi zaten incelenen mekanizma oldugu icin gerekli.
+  width: 240            # izgara hucresi sayisi (x)
+  height: 150           # izgara hucresi sayisi (y)
   toroidal: true        # kenarlar sarmali mi (donut dunya)
 
   food:
     # Kapasite alani: gaussian "yamalar" toplamiyla uretilir.
     # Yamali dunya => sineklerin kaynak etrafinda kumelenmesi mumkun olur.
-    patches: 14           # yama sayisi
+    patches: 24           # yama sayisi
     patch_radius: 11.0    # yama yaricapi (hucre)
     patch_peak: 1.0       # yama merkezindeki kapasite
     background: 0.05      # yama disi taban kapasite
@@ -46,8 +54,8 @@ world:
     light_gradient: none
 
 agents:
-  initial_count: 120
-  max_count: 1200         # populasyon tavani (bellek/hiz emniyeti)
+  initial_count: 300      # ayni zamanda KURUCU SOY sayisi (her birine benzersiz soyisim)
+  max_count: 700         # populasyon tavani (bellek/hiz emniyeti)
   spawn: scatter          # scatter | center
 
   energy:
@@ -100,6 +108,7 @@ genome:
     graze_slowdown: 0.75    # yemek uzerinde yavaslama (alan-kisitli arama)
     panic_speed: 0.60       # tehlike yakininda hizlanma
     hunger_speed: 0.25      # aclikta hizlanma
+    share_urge: 0.00        # refleks beynin kosulsuz paylasim egilimi (Faz 3)
 
 evolution:
   enabled: true           # FAZ 2: mutasyon ACIK. false -> klonlar (Faz 1 kontrolu)
@@ -110,8 +119,12 @@ evolution:
   # generational : Klasik GA; sabit uzunlukta nesiller, nesil sonunda toplu
   #                secilim. "Ortalama basari nesiller boyunca artiyor mu"
   #                sorusunun en temiz olculdugu mod.
-  mode: generational
+  # FAZ 3 steady_state kullanir: akrabalik secilimi ekolojiye muhtactir.
+  # Nesil sinirinda dunyayi sifirlayip herkesi rastgele dagitmak, akrabalarin
+  # uzamsal kumelenmesini — yani mekanizmanin kendisini — yok eder.
+  mode: steady_state
   generation_length: 250  # generational: bir neslin adim sayisi
+  epoch_length: 500       # steady_state: periyodik evrim raporu araligi
   reset_world: true       # generational: her nesilde yemek stogu sifirlansin mi
   elite_count: 3          # en iyi N genom mutasyonsuz gecer
   tournament_size: 3      # turnuva secilimi aday sayisi (buyuk = sert secilim)
@@ -149,21 +162,48 @@ evolution:
     graze_slowdown: [0.0, 1.0]
     panic_speed: [0.0, 2.0]
     hunger_speed: [0.0, 1.5]
+    share_urge: [0.0, 1.0]
 
 rules:
-  # FAZ 3 icin ayrilmis kural motoru. Faz 1'de hepsi etkisiz.
-  # Kural degistirip sonucu gormek icin buradan oynayacaksiniz.
+  # =================================================================
+  #  FAZ 3 — akrabalik ve isbirligi
+  #
+  #  UC KURAL (ihlali deneyi gecersiz kilar):
+  #   1. Rol/kast KODLANMAZ. Kosullar kurulur, is bolumu cikarsa cikar.
+  #   2. PAYLASIM ODULLENDIRILMEZ. evolution.fitness icinde paylasim terimi
+  #      YOKTUR. Verenin net maliyeti vardir; kâr yalnizca DOLAYLI olabilir
+  #      (akrabaya yardim = ortak genin hayatta kalmasi).
+  #   3. Isbirligi in-group / out-group diye AYRI olculur; ittifak kural
+  #      olarak atanmaz, sadece oranlar raporlanir.
+  # =================================================================
   share:
-    enabled: false
-    amount: 4.0           # verilen enerji
-    reward: 0.0           # verene ek odul
-    radius: 2.0
+    enabled: true
+    threshold: 0.55       # motor bu esigi asarsa paylasir
+    amount: 8.0           # motor=1 iken aktarilan azami enerji
+    overhead: 1.2         # verenin EKSTRA kaybi -> net maliyet sarti
+    min_donor_energy: 10.0  # verenin altina inemeyecegi taban
+
   attack:
-    enabled: false
+    enabled: false        # FAZ 3 ADIM 2 (acilirsa NotImplementedError)
     damage: 8.0
-    steal_ratio: 0.5      # calinan enerjinin ne kadari saldirana gecer
-    penalty: 0.0          # saldirana ek ceza
-    radius: 1.5
+    steal_ratio: 0.5
+    penalty: 0.0
+
+  kinship:
+    radius: 2.5           # hem akrabalik sensoru hem paylasim menzili
+    # KONTROL GRUPLARI — akrabalik yapisini bozarlar:
+    #   none                    : normal kosum
+    #   random_surname_at_birth : etiket birey icin sabit ama KALITSAL DEGIL
+    #                             -> soyisim gercek akrabalik bildirmez (asil kontrol)
+    #   shuffle_surnames        : her adim yasayanlar arasinda karistir
+    #   scatter_offspring       : yavru haritaya rastgele dogar (uzamsal yapi bozulur)
+    control: none
+    # Soy bolunmesi: yavrunun soyismi bu olasilikla YENI olur.
+    # Soylar yalnizca tukenebildigi icin (yeni kurucu yok) etiket cesitliligi
+    # bu olmadan sifira gider; herkes akraba olunca in/out ayrimi anlamsizlasir.
+    # Yuksek deger etiketin akrabalik BILGISINI bozar -> dusuk tutulmali.
+    # Kontrol gruplarina da birebir ayni oranda uygulanir.
+    split_rate: 0.010
 
 metrics:
   enabled: true
@@ -172,8 +212,10 @@ metrics:
 
 viz:
   mode: frames            # none | frames | pygame
-  scale: 6                # 1 dunya hucresi = kac piksel
-  every: 20               # kac adimda bir kare
+  color_by: lineage       # energy | lineage — Faz 3'te soyisme gore renk
+  show_share: true        # paylasim olaylarini yesil cizgiyle goster
+  scale: 4                # 1 dunya hucresi = kac piksel
+  every: 100              # kac adimda bir kare
   frames_dir: frames
   max_frames: 400
   fps: 45                 # sadece pygame

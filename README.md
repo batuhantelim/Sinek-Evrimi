@@ -15,12 +15,13 @@ pip install pygame                  # opsiyonel: canlı pencere
 ## Çalıştırma
 
 ```bash
-python run.py                       # config.yaml (Faz 2) ile koş, PNG kare kaydet
+python run.py                       # config.yaml (Faz 3) ile koş, PNG kare kaydet
 python run.py --viz pygame          # canlı pencere (SPACE duraklat, Q çık)
 python run.py --steps 1000 --viz none
 python run.py --check-determinism
 python -m unittest discover -s tests
-python tools/plot_metrics.py runs/faz2 --generations
+python tools/plot_metrics.py runs/faz3 --generations
+python tools/kin_probe.py runs/faz3/population.npz
 ```
 
 Çıktılar `runs/<name>/`: `metrics.csv`, `summary.txt`, `frames/*.png`,
@@ -43,6 +44,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 |---|---|---|
 | 1 | Klon ajan + ortam + hareket + yemek + üreme/ölüm | ✅ |
 | 2 | Mutasyon + seçilim + evrimleşebilir recurrent sinir ağı | ✅ |
-| 3 | Sosyal kurallar: paylaşma / saldırma | ⏳ |
+| 3 — adım 1 | Soyisim + akrabalık sensörü + paylaşma + kontrol grupları | ✅ |
+| 3 — adım 2 | `attack`, tam in/out-group düşmanlık analizi | ⏳ |
 
-Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/)
+Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/)

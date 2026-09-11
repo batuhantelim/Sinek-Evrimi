@@ -26,11 +26,14 @@ class Genome:
 
     params: dict[str, float]
     weights: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
-    lineage: int = 0  # kacinci nesil torun
+    lineage: int = 0   # kacinci nesil torun (soyagaci DERINLIGI)
+    surname: int = 0   # Faz 3: soyisim. Kurucuya benzersiz atanir, yavru miras alir.
+    #  DIKKAT: ayni soyisim != genetik olarak ozdes. Etiket soyagacini izler,
+    #  guncel benzerligi degil; mutasyon zamanla ayni soyadi tasiyanlari ayirir.
 
     # --- kopya / ureme -------------------------------------------------
     def copy(self) -> "Genome":
-        return Genome(dict(self.params), self.weights.copy(), self.lineage)
+        return Genome(dict(self.params), self.weights.copy(), self.lineage, self.surname)
 
     def child(self, cfg, rng: np.random.Generator) -> "Genome":
         """Ureme sirasinda cagrilir. Mutasyon kapaliysa saf klon dondurur."""

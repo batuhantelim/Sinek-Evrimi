@@ -80,5 +80,5 @@ class TinyRNN(Brain):
         # thrust ve eat 0..1 araliginda olmali; tanh'i kaydirip olcekliyoruz
         motors[M["thrust"]] = 0.5 * (np.tanh(out[M["thrust"]]) + 1.0)
         motors[M["eat"]] = 0.5 * (np.tanh(out[M["eat"]]) + 1.0)
-        motors[M["social"]] = np.tanh(out[M["social"]])  # Faz 3
+        motors[M["share"]] = 0.5 * (np.tanh(out[M["share"]]) + 1.0)  # Faz 3
         return motors

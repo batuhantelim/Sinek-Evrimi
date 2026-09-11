@@ -18,6 +18,32 @@ TEXT = np.array([200, 210, 225], dtype=np.uint8)
 DIM = np.array([110, 120, 140], dtype=np.uint8)
 
 
+# En kalabalik soylara elle secilmis, birbirinden acikca ayrilan renkler.
+# Yuzlerce soya otomatik ton atamak (altin oran vb.) ekranda ayirt edilemeyen
+# bir konfeti uretiyordu; asil soru "akrabalar kumeleniyor mu" oldugu icin
+# baskin birkac soyun okunabilir olmasi, hepsinin benzersiz olmasindan onemli.
+LINEAGE_PALETTE = [
+    (255, 90, 80),    # kirmizi
+    (90, 210, 255),   # camgobegi
+    (250, 215, 80),   # sari
+    (200, 120, 255),  # mor
+    (110, 235, 130),  # yesil
+    (255, 155, 70),   # turuncu
+    (120, 140, 255),  # mavi
+    (255, 130, 195),  # pembe
+]
+OTHER_LINEAGE = (135, 140, 150)  # geri kalan tum soylar: notr gri
+
+
+def lineage_colors(agents, top_n: int = len(LINEAGE_PALETTE)) -> dict[int, tuple]:
+    """En kalabalik `top_n` soya palet rengi, digerlerine gri atar."""
+    counts: dict[int, int] = {}
+    for a in agents:
+        counts[a.genome.surname] = counts.get(a.genome.surname, 0) + 1
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:top_n]
+    return {name: LINEAGE_PALETTE[i] for i, (name, _n) in enumerate(ranked)}
+
+
 def _hud_height(cfg) -> int:
     return (GLYPH_H + 5) * 2 if bool(cfg.get("viz.hud", True)) else 0
 
@@ -61,15 +87,40 @@ def render(sim) -> np.ndarray:
     if hud_h:
         img[:hud_h] = HUD_BG
 
+    # --- paylasim olaylari (ajanlarin ALTINA cizilir ki noktalar ustte kalsin) ---
+    if bool(cfg.get("viz.show_share", True)):
+        for x1, y1, x2, y2, kin in getattr(sim, "share_events", ()):
+            dx, dy = world.delta(x1, y1, x2, y2)
+            if math.hypot(dx, dy) > world.width * 0.25:
+                continue  # sarmali dunyada ekrani boydan boya kesen cizgi cizme
+            # akrabaya paylasim parlak yesil, yabanciya soluk camgobegi
+            col = (170, 255, 190) if kin else (80, 150, 175)
+            _line(
+                img,
+                int(x1 * scale), int(y1 * scale) + hud_h,
+                int((x1 + dx) * scale), int((y1 + dy) * scale) + hud_h,
+                col,
+            )
+
     # --- ajanlar ---
     e_max = float(cfg.agents.energy.max)
-    dot = max(1, scale // 2)
+    by_lineage = str(cfg.get("viz.color_by", "energy")) == "lineage"
+    dot = max(2, scale // 2 + 1) if by_lineage else max(1, scale // 2)
+    palette = lineage_colors(sim.agents) if by_lineage else {}
     for a in sim.agents:
         px = int(a.x * scale)
         py = int(a.y * scale) + hud_h
         t = min(1.0, max(0.0, a.energy / e_max))
-        # dusuk enerji: soguk mavi -> yuksek enerji: sicak sari
-        color = (int(70 + 185 * t), int(90 + 130 * t), int(235 - 190 * t))
+        if by_lineage:
+            # ton = soyisim (kimlik), parlaklik = enerji (durum).
+            # Alt sinir yuksek tutuldu: ac bir sinek sonuk olsun ama rengi
+            # hala okunabilsin.
+            r, g, b = palette.get(a.genome.surname, OTHER_LINEAGE)
+            k = 0.60 + 0.40 * t
+            color = (int(r * k), int(g * k), int(b * k))
+        else:
+            # dusuk enerji: soguk mavi -> yuksek enerji: sicak sari
+            color = (int(70 + 185 * t), int(90 + 130 * t), int(235 - 190 * t))
         _blit(img, px, py, dot, color)
         if scale >= 5:  # bakis yonu tirnagi
             hx = int(px + math.cos(a.heading) * scale * 0.9)
@@ -79,6 +130,16 @@ def render(sim) -> np.ndarray:
     if hud_h:
         _draw_hud(img, sim, w_px, hud_h)
     return img
+
+
+def _line(img: np.ndarray, x0: int, y0: int, x1: int, y1: int, color) -> None:
+    n = max(abs(x1 - x0), abs(y1 - y0), 1)
+    h, w = img.shape[:2]
+    for i in range(n + 1):
+        x = int(round(x0 + (x1 - x0) * i / n))
+        y = int(round(y0 + (y1 - y0) * i / n))
+        if 0 <= x < w and 0 <= y < h:
+            img[y, x] = color
 
 
 def _blit(img: np.ndarray, x: int, y: int, size: int, color) -> None:
@@ -94,10 +155,23 @@ def _draw_hud(img: np.ndarray, sim, w_px: int, hud_h: int) -> None:
     energy = row.get("mean_energy", 0.0)
     fill = row.get("food_fill", 0.0)
     clus = row.get("clustering", 0.0)
-    div = row.get("behavior_diversity", 0.0)
 
-    line1 = f"STEP {sim.step_index}   N {sim.population}   ENERJI {energy:.0f}"
-    line2 = f"YEMEK {fill * 100:.0f}%   KUME {clus:+.2f}   CESIT {div:.3f}   SEED {sim.seed}"
+    line1 = (
+        f"STEP {sim.step_index}   N {sim.population}   ENERJI {energy:.0f}   "
+        f"YEMEK {fill * 100:.0f}%   KUME {clus:+.2f}   SOY {row.get('lineage_count', 0)}"
+        f"/{row.get('lineage_effective', 0.0):.1f}"
+    )
+    if getattr(sim, "_share_on", False):
+        line2 = (
+            f"AKRABAYA PAYLASIM {row.get('coop_in_group', 0.0) * 100:5.2f}%   "
+            f"YABANCIYA {row.get('coop_out_group', 0.0) * 100:5.2f}%   "
+            f"FARK {row.get('kin_bias', 0.0) * 100:+5.2f}   SEED {sim.seed}"
+        )
+    else:
+        line2 = (
+            f"CESIT {row.get('behavior_diversity', 0.0):.3f}   "
+            f"AGIRLIK {row.get('weight_diversity', 0.0):.3f}   SEED {sim.seed}"
+        )
     draw_text(img, line1, 4, 3, TEXT, scale=1)
     draw_text(img, line2, 4, 3 + GLYPH_H + 3, DIM, scale=1)
 

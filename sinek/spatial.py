@@ -26,6 +26,35 @@ class SpatialHash:
     def _key(self, x: float, y: float) -> tuple[int, int]:
         return int(x / self.cell) % self.nx, int(y / self.cell) % self.ny
 
+    def nearest(self, agent, radius: float, world):
+        """radius icindeki EN YAKIN ajan (kendisi haric) ya da None.
+
+        Liste kurup siralamaktan kacinir: Faz 3'te her ajan icin her adimda
+        cagrildigi icin sicak yol burasi. Beraberlikte kucuk id kazanir
+        (determinizm).
+        """
+        x, y = agent.x, agent.y
+        span = int(math.ceil(radius / self.cell))
+        cx, cy = self._key(x, y)
+        best = None
+        best_d2 = radius * radius
+        for gy in range(cy - span, cy + span + 1):
+            for gx in range(cx - span, cx + span + 1):
+                if self.toroidal:
+                    key = (gx % self.nx, gy % self.ny)
+                else:
+                    if not (0 <= gx < self.nx and 0 <= gy < self.ny):
+                        continue
+                    key = (gx, gy)
+                for other in self.buckets.get(key, ()):
+                    if other.id == agent.id:
+                        continue
+                    dx, dy = world.delta(x, y, other.x, other.y)
+                    d2 = dx * dx + dy * dy
+                    if d2 < best_d2 or (d2 == best_d2 and best is not None and other.id < best.id):
+                        best, best_d2 = other, d2
+        return best
+
     def query(self, x: float, y: float, radius: float, world, exclude_id: int = -1) -> list:
         """radius icindeki ajanlar (kendisi haric), deterministik sirada."""
         span = int(math.ceil(radius / self.cell))

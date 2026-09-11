@@ -46,7 +46,7 @@ def measure(genomes, seed: int, steps: int, extra=()) -> dict:
         if not sim.agents:
             break
         if sim.step_index % 5 == 0:  # ucuz olsun diye seyrek ornekleme
-            sensors = np.array([a.sense(sim.world, cfg) for a in sim.agents])
+            sensors = np.array([a.sense(sim.world, sim.physics) for a in sim.agents])
             align += float(sensors[:, S["food_fwd"]].mean())
             hazard += float((sensors[:, S["hazard_near"]] > 0.8).mean())
             on_food += float((sensors[:, S["food_here"]] > 0.05).mean())

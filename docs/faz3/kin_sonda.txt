@@ -1,0 +1,10 @@
+Sonda: ayni sensor vektoru, yalnizca akrabalik kanali degisiyor.
+       paylasim motoru farki = ortalama(share | akraba) - ortalama(share | yabanci)
+       120 sensor ornegi x genom basina
+
+  kayit                               genom      fark    medyan  akrabayi kayiran
+  faz3                                  372   +0.0287   +0.0112             53.8%
+  faz3_kontrol_karistir                 410   +0.1035   +0.1003             82.4%
+  faz2                                  120   +0.0000   +0.0000              0.0%
+
+  fark ~0 ve kayirma ~%50 ise beyin akrabalik kanalini OKUMUYOR demektir.

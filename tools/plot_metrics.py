@@ -30,6 +30,15 @@ SERIES = [(250, 200, 90), (90, 210, 140), (120, 170, 255), (245, 120, 120), (200
 
 DEFAULT_COLS = "population,mean_energy,food_fill,clustering,behavior_diversity"
 GENERATION_COLS = "mean_fitness,max_fitness,mean_food_eaten,survivors,weight_diversity"
+# Faz 3 kayitlarinda (kin_bias sutunu varsa) otomatik olarak bunlar cizilir.
+GENERATION_COLS_KIN = (
+    "coop_in_group,coop_out_group,kin_bias,lineage_effective,mean_food_eaten"
+)
+
+
+def _header(path: str) -> list[str]:
+    with open(path, newline="", encoding="utf-8") as fh:
+        return next(csv.reader(fh), [])
 
 
 def read_csv(path: str) -> dict[str, np.ndarray]:
@@ -142,7 +151,13 @@ def main(argv=None) -> int:
     csv_name = "generations.csv" if args.generations else "metrics.csv"
     x_col = args.x or ("generation" if args.generations else "step")
     if args.generations and args.cols == DEFAULT_COLS:
-        args.cols = GENERATION_COLS
+        first = args.runs[0]
+        path = first if first.endswith(".csv") else os.path.join(first, csv_name)
+        args.cols = (
+            GENERATION_COLS_KIN
+            if os.path.exists(path) and "kin_bias" in _header(path)
+            else GENERATION_COLS
+        )
 
     default_name = "generations.png" if args.generations else "metrics.png"
     out = args.out or os.path.join(

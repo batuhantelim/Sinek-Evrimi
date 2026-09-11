@@ -1,0 +1,8 @@
+# FAZ 3 KONTROL (alternatif): soyisimler her adim yasayanlar arasinda karistirilir.
+# Akrabalik sensoru saf gurultuye doner. En sert kontrol.
+#   python run.py --config experiments/faz3_kontrol_karistir.yaml
+run:
+  name: faz3_kontrol_karistir
+rules:
+  kinship:
+    control: shuffle_surnames

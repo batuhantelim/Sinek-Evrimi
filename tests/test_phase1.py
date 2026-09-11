@@ -23,6 +23,9 @@ BASE = [
     "evolution.enabled=false",
     "evolution.mode=steady_state",
     "evolution.founder_spread=0.0",
+    "agents.initial_count=120",
+    "agents.max_count=1200",
+    "rules.share.enabled=false",
 ]
 
 
@@ -88,7 +91,7 @@ class TestPhase1(unittest.TestCase):
     def test_gradient_sensor_is_informative(self):
         """food_strength sensoru olu olmamali ve sinekler gradyanla hizalanmali."""
         sim = make(steps=120, agents__initial_count=100)
-        sensors = np.array([a.sense(sim.world, sim.cfg) for a in sim.agents])
+        sensors = np.array([a.sense(sim.world, sim.physics) for a in sim.agents])
         strength = sensors[:, SENSOR_NAMES.index("food_strength")]
         fwd = sensors[:, SENSOR_NAMES.index("food_fwd")]
         self.assertGreater(strength.mean(), 0.05, "koku sinyali fiilen sifir")
@@ -130,7 +133,7 @@ class TestPhase1(unittest.TestCase):
                 np.array([a.y for a in sim.agents], dtype=np.float32),
             )
             for a in sim.agents:
-                a.apply_motors(a.brain.act(a.sense(sim.world, sim.cfg), sim.rng), sim.world, sim.cfg)
+                a.apply_motors(a.brain.act(a.sense(sim.world, sim.physics), sim.rng), sim.world, sim.physics)
         eaten = sim.world.food_consumed_total
         self.assertGreater(eaten, 0.0)
         self.assertAlmostEqual(sim.world.food_total, start + regrown - eaten, delta=1e-2)
@@ -146,9 +149,12 @@ class TestPhase1(unittest.TestCase):
         dx, dy = w.delta(1.0, 1.0, w.width - 1.0, 1.0)
         self.assertAlmostEqual(dx, -2.0)
 
-    def test_phase3_rules_are_explicitly_unimplemented(self):
-        """Faz 3 kurallari acilirsa sessizce yok sayilmamali, hata vermeli."""
-        sim = make(rules__share__enabled=True)
+    def test_unimplemented_rules_fail_loudly(self):
+        """Henuz yazilmamis kural acilirsa sessizce yok sayilmamali, patlamali.
+
+        (share Faz 3'te uygulandi; sinir artik attack'te.)
+        """
+        sim = make(rules__attack__enabled=True)
         with self.assertRaises(NotImplementedError):
             sim.step()
 

@@ -20,7 +20,20 @@ from sinek.genome import founder_genome
 from sinek.metrics import behavior_diversity, weight_diversity
 from sinek.simulation import Simulation
 
-BASE = ["viz.mode=none", "metrics.enabled=false"]
+# Faz 2 testleri kendi fazlarini sabitler: nesilli GA, rnn, sosyal kural yok.
+# (config.yaml varsayilani artik Faz 3'tur.)
+BASE = [
+    "viz.mode=none",
+    "metrics.enabled=false",
+    "brain.type=rnn",
+    "evolution.enabled=true",
+    "evolution.mode=generational",
+    "evolution.generation_length=250",
+    "evolution.founder_spread=1.0",
+    "agents.initial_count=120",
+    "agents.max_count=1200",
+    "rules.share.enabled=false",
+]
 DRIFT = [  # secilim baskisini tamamen kaldirir: turnuva rastgele ebeveyn secer
     "evolution.fitness.age=0.0",
     "evolution.fitness.children=0.0",
