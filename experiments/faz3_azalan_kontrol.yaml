@@ -1,0 +1,17 @@
+# faz3_azalan_verim.yaml ile AYNI rejim + soyisim karistirma kontrolu.
+# Etiket bilgisizken kin_bias duz kalmali; kalmiyorsa bulgu yapaylik demektir.
+#   python run.py --config experiments/faz3_azalan_kontrol.yaml
+run:
+  name: faz3_azalan_kontrol
+  steps: 6000
+agents:
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+rules:
+  share:
+    need_bonus: 3.0
+  kinship:
+    control: shuffle_surnames

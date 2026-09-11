@@ -31,6 +31,7 @@ davranış oradan **türer**.
 | **Faz 1** | Tek tip (klon) ajan + ortam + hareket + yemek + üreme/ölüm | ✅ tamam |
 | **Faz 2** | Mutasyon + seçilim + evrimleşebilir recurrent sinir ağı | ✅ **tamam** |
 | **Faz 3 — adım 1** | Soyisim + akrabalık sensörü + paylaşma + kontrol grupları | ✅ **tamam** |
+| **Faz 3 — adım 1.5** | Hamilton kuralı `r·b/c` taraması; yapısal engelin bulunması | ✅ **tamam** |
 | **Faz 3 — adım 2** | `attack`, tam in/out-group düşmanlık analizi | ⏳ onay bekliyor |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 3).
@@ -67,6 +68,7 @@ sinek/
 tools/plot_metrics.py   metrics.csv / generations.csv → PNG grafik
 tools/benchmark_genomes.py  Evrimleşmiş koloni vs acemi koloni, aynı dünyada
 tools/kin_probe.py      Akrabalık sensörü sondası: beyin akrabalığı okuyor mu?
+tools/sweep_hamilton.py Hamilton kuralı rejim taraması (her rejim + kontrolü)
 tests/                  unittest — determinizm + Faz 1 + Faz 2 testleri
 ```
 
@@ -277,6 +279,27 @@ Herkes akraba olunca in/out ayrımı anlamını yitirir. İki önlem:
 Her koşumda `lineage_effective` ve `opp_kin` izlenmelidir: örneklem küçülürse
 oran gürültüdür.
 
+### ⚠ Hamilton kuralı bu tasarımda yapısal olarak sağlanamıyordu
+
+Paylaşım muhasebesi: `c = amount + overhead`, `b = min(amount, boşluk) ≤ amount`.
+Yani **`b/c ≤ 1` yapısaldır**; `r ≤ 1` de tanım gereği. Hamilton `r·b/c > 1`
+ister — doğrusal aktarımla **imkânsız**. 9 rejimlik tarama bunu doğruladı:
+ölçülen en yüksek `r·b/c = 0.52` (bkz. [docs/faz3/adim15_hamilton.md](docs/faz3/adim15_hamilton.md)).
+
+Tek kaçış, enerjinin fitness'a dönüşümünün doğrusal olmadığı yer: ölmek üzere
+olan bir alıcı. İki ekleme bunu erişilebilir kıldı:
+
+- **`neighbor_need` sensörü** — beyin komşusunun açlığını göremiyordu, o anı
+  hedefleyemiyordu. Bilgi kanalı, ödül değil.
+- **`rules.share.need_bonus`** — aynı kalorinin aç bir alıcıya daha değerli
+  olması (alıcının dönüşüm verimi). Verene hiçbir şey kazandırmaz;
+  "paylaşım ödüllendirilmez" kuralı korunur. `0.0` = doğrusal (adım 1 davranışı).
+
+Sonuç: `b/c` 0.73 → 1.16, paylaşım oranı %2.09 → %6.02, kontrolden ayrıştı
+(t = +2.48). **Yeni bir sosyal kural eklerken önce `r·b/c`'nin 1'i
+geçebildiğini doğrulayın**, yoksa negatif sonuç mekanizmadan değil
+muhasebeden gelir.
+
 ### ⚠ `kin_bias` tek başına kanıt değildir
 
 Akrabalar uzamsal kümelenir → kümeler zengin yamalardadır → oradaki sinekler
@@ -388,6 +411,10 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `kin_bias` | ham fark — **konfoundlu**, tek başına kullanmayın |
 | `kin_bias_adj` | enerji katmanlı düzeltilmiş fark — güvenilen ölçü |
 | `opp_kin`, `opp_nonkin` | örneklem büyüklükleri (küçükse oran gürültüdür) |
+| `kin_assortment` | `(gözlenen−beklenen)/(1−beklenen)` ≈ Hamilton'un `r`'si |
+| `kin_expected`, `kin_observed` | assortment'in taban çizgisi ve gözlemi |
+| `bc_ratio` | gerçekleşen `b/c` — doğrusal aktarımda yapısal olarak ≤ 1 |
+| `rescue_share` | paylaşımların kaçı ölmek üzere olan birine gitti |
 | `gp_<parametre>` | her genom parametresinin popülasyon ortalaması — evrimin **yönü** |
 | `cooperation_rate` | Faz 3 için ayrılmış |
 

@@ -182,6 +182,15 @@ rules:
     amount: 8.0           # motor=1 iken aktarilan azami enerji
     overhead: 1.2         # verenin EKSTRA kaybi -> net maliyet sarti
     min_donor_energy: 10.0  # verenin altina inemeyecegi taban
+    # AZALAN VERIM (Faz 3 adim 1.5'te olculdu, bkz. docs/faz3/):
+    # Ham enerji aktariminda veren amount+overhead kaybeder, alici en fazla
+    # amount kazanir -> b/c <= 1 YAPISALDIR. r <= 1 oldugu icin Hamilton
+    # kurali r*b > c bu haliyle ASLA saglanamaz.
+    # Bu katsayi ayni kalorinin AC bir aliciya daha degerli olmasini modeller
+    # (alicinin donusum verimi). Verene hicbir sey kazandirmaz, odul degildir.
+    #   0.0 = dogrusal (adim 1 davranisi)
+    #   3.0 = olmek uzere olan alici 4 kat verim alir
+    need_bonus: 0.0
 
   attack:
     enabled: false        # FAZ 3 ADIM 2 (acilirsa NotImplementedError)

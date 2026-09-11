@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sinek.agent import M, S
 from sinek.config import load_config
-from sinek.metrics import lineage_stats, social_rates, stratified_kin_bias
+from sinek.metrics import kin_assortment, lineage_stats, social_rates, stratified_kin_bias
 from sinek.simulation import Simulation
 
 BASE = ["viz.mode=none", "metrics.enabled=false"]
@@ -84,6 +84,56 @@ class TestKinSensor(unittest.TestCase):
         self.assertEqual(self._sense_kin(True), 1.0)
         self.assertEqual(self._sense_kin(False), -1.0)
         self.assertEqual(self._sense_kin(None), 0.0, "komsu yoksa sensor 0 olmali")
+
+
+class TestNeedSensor(unittest.TestCase):
+    def test_neighbour_need_tracks_recipient_energy(self):
+        sim = make(agents__initial_count=2)
+        a, b = sim.agents
+        a.nearest = b
+        e_max = sim.physics.energy_max
+
+        b.energy = e_max
+        self.assertAlmostEqual(float(a.sense(sim.world, sim.physics)[S["neighbor_need"]]), 0.0)
+        b.energy = e_max * 0.25
+        self.assertAlmostEqual(
+            float(a.sense(sim.world, sim.physics)[S["neighbor_need"]]), 0.75, places=5
+        )
+        a.nearest = None
+        self.assertEqual(float(a.sense(sim.world, sim.physics)[S["neighbor_need"]]), 0.0)
+
+
+class TestHamiltonAccounting(unittest.TestCase):
+    def test_raw_energy_benefit_never_exceeds_cost(self):
+        """Ham enerjide b <= c YAPISALDIR: veren amount+overhead kaybeder,
+        alici en fazla amount kazanir. Hamilton kurali ancak enerjinin
+        fitness'a donusumunun dogrusal olmadigi yerde saglanabilir."""
+        sim = make(steps=400, agents__initial_count=150)
+        cost = sim.stats_total["share_cost"]
+        benefit = sim.stats_total["share_benefit"]
+        self.assertGreater(cost, 0.0, "hic paylasim olmadi, test bos")
+        self.assertLessEqual(benefit, cost + 1e-6)
+        self.assertLessEqual(social_rates(sim.stats_total)["bc_ratio"], 1.0 + 1e-9)
+
+    def test_kin_assortment_scale(self):
+        """0 = akrabalar rastgele dagilmis, 1 = komsular daima akraba."""
+        self.assertAlmostEqual(kin_assortment(20, 80, 0.20)["kin_assortment"], 0.0, places=6)
+        self.assertAlmostEqual(kin_assortment(100, 0, 0.20)["kin_assortment"], 1.0, places=6)
+        self.assertLess(kin_assortment(5, 95, 0.20)["kin_assortment"], 0.0)
+
+    def test_lineage_stats_reports_mixing_baseline(self):
+        class G:
+            def __init__(self, s):
+                self.surname = s
+
+        class A:
+            def __init__(self, s):
+                self.genome = G(s)
+
+        # yari yariya iki soy -> iyi karismis dunyada akraba olasiligi 0.5
+        self.assertAlmostEqual(
+            lineage_stats([A(1), A(1), A(2), A(2)])["kin_expected"], 0.5, places=5
+        )
 
 
 class TestShareMechanics(unittest.TestCase):

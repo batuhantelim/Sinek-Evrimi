@@ -34,6 +34,12 @@ SENSOR_NAMES: list[str] = [
                         #    AYRI kanal olmasi sart: tek kanalda {-1,0,+1} ile
                         #    "akraba mi" ile "biri var mi" ayrilamaz, agirligi
                         #    yorumlanamaz hale gelir.
+    "neighbor_need",    # 15 en yakin ajanin enerji acigi (0 tok .. 1 olmek uzere)
+                        #    Bilgi kanali, odul DEGIL. Ham enerjide b <= c oldugu
+                        #    icin Hamilton kurali ancak enerjinin fitness'a
+                        #    donusumunun DOGRUSAL OLMADIGI yerde saglanabilir:
+                        #    olmek uzere olan birine verilen enerji cok degerlidir.
+                        #    Bu kanal olmadan beyin o ani HEDEFLEYEMEZ.
 ]
 N_SENSORS = len(SENSOR_NAMES)
 
@@ -128,6 +134,9 @@ class Agent:
         if self.nearest is not None:
             s[S["kin"]] = 1.0 if self.nearest.genome.surname == self.genome.surname else -1.0
             s[S["near_agent"]] = 1.0
+            s[S["neighbor_need"]] = min(
+                1.0, max(0.0, 1.0 - self.nearest.energy / phys.energy_max)
+            )
 
         return s
 

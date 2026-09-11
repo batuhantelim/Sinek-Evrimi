@@ -39,6 +39,7 @@ from .physics import Physics
 from .metrics import (
     behavior_diversity,
     genome_param_means,
+    kin_assortment,
     lineage_stats,
     social_rates,
     weight_diversity,
@@ -364,9 +365,16 @@ class Simulation:
             "behavior_diversity": round(behavior_diversity(pool), 5),
             "weight_diversity": round(weight_diversity(pool), 5),
         }
-        row.update(lineage_stats(self.agents))
+        lin = lineage_stats(self.agents)
+        row.update(lin)
         acc = self._epoch_acc if self.mode != "generational" else self.stats_total
         row.update(social_rates(acc))
+        # NOT: firsat sayimlari donem boyunca birikir, soy dagilimi ise donem
+        # SONUNDAKI anlik durumdur. Yavas degisen bir buyukluk oldugu icin
+        # kabul edilebilir bir yaklasiklik.
+        row.update(
+            kin_assortment(acc.get("opp_kin", 0), acc.get("opp_nonkin", 0), lin["kin_expected"])
+        )
         # Ornek buyuklukleri satirda dursun: kucuk opp_kin ile hesaplanan bir
         # in-group orani gurultudur, okuyan bunu gorebilmeli.
         for key in ("opp_kin", "opp_nonkin", "share_kin", "share_nonkin"):
@@ -408,6 +416,10 @@ class Simulation:
         floor = float(sh.min_donor_energy)
         radius2 = self.kin_radius * self.kin_radius
         e_max = self.physics.energy_max
+        # "Kurtarma" esigi: bu enerjinin altindaki bir sinek ~20 adim icinde
+        # aclıktan olur. Dogrusal olmayan faydanin gerceklestigi yer burasi.
+        rescue_level = 20.0 * self.physics.metabolism
+        need_bonus = float(sh.get("need_bonus", 0.0))
         stats = self.stats_step
 
         for a in self.agents:
@@ -445,13 +457,34 @@ class Simulation:
             a.shares_made += 1
             # Alici tavanini asamaz; asan kisim BOSA GIDER (azalan verim —
             # tok bir sinege vermek israf, ac olana vermek hayat kurtarir)
-            taken = min(amount, e_max - other.energy)
+            recipient_energy = other.energy
+            # AZALAN VERIM. Ham enerji aktariminda b <= c YAPISALDIR (veren
+            # amount+overhead oder, alici en fazla amount alir), dolayisiyla
+            # r <= 1 ile Hamilton kurali r*b > c ASLA saglanamaz. Bu katsayi
+            # ayni kalorinin ac bir aliciya daha degerli olmasini modeller.
+            # Verene hicbir sey kazandirmaz — odul degil, alicinin donusum
+            # verimidir. 0.0 = dogrusal (varsayilan, onceki davranis).
+            delivered = amount
+            if need_bonus > 0.0:
+                need = max(0.0, 1.0 - recipient_energy / e_max)
+                delivered = amount * (1.0 + need_bonus * need)
+            taken = min(delivered, e_max - other.energy)
             if taken > 0.0:
                 other.energy += taken
                 other.received += taken
 
             stats["share_events"] += 1
             stats["share_energy"] += amount
+            # Gerceklesen fayda/maliyet muhasebesi (Hamilton'un b ve c'si):
+            #   c = verenin kaybi  = amount + overhead
+            #   b = alicinin kazanci = taken  (tavani asan kisim bosa gider)
+            # Ham enerjide b <= c HER ZAMAN dogrudur; b > c ancak enerjinin
+            # fitness'a donusumu DOGRUSAL OLMADIGI yerde olabilir: olmek uzere
+            # olan bir aliciya verilen enerji cok daha degerlidir.
+            stats["share_cost"] += amount + overhead
+            stats["share_benefit"] += taken
+            if recipient_energy < rescue_level:
+                stats["share_rescue"] += 1
             stats["share_kin" if kin else "share_nonkin"] += 1
             stats[f"{'shr_kin' if kin else 'shr_non'}_{bucket}"] += 1
             self.share_events.append((a.x, a.y, other.x, other.y, kin))
@@ -535,6 +568,9 @@ def _empty_stats() -> dict:
         "opp_nonkin": 0,        # en yakin komsusu YABANCI olan ajan-adim sayisi
         "share_kin": 0,         # bunlarin kacinda paylasildi
         "share_nonkin": 0,
+        "share_cost": 0.0,      # verenlerin toplam kaybi   (Hamilton c)
+        "share_benefit": 0.0,   # alicilarin toplam kazanci (Hamilton b)
+        "share_rescue": 0,      # olmek uzere olan bir aliciya yapilan paylasim
         # Enerji katmanli sayimlar (konfound duzeltmesi icin)
         **{f"opp_kin_{b}": 0 for b in range(ENERGY_BUCKETS)},
         **{f"opp_non_{b}": 0 for b in range(ENERGY_BUCKETS)},

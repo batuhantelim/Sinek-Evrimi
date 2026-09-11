@@ -38,7 +38,8 @@ def probe(genomes, cfg, samples: int = 200, seed: int = 0) -> dict:
     # Ortak sensor havuzu: her genom AYNI girdileri gorur.
     base = rng.uniform(-1.0, 1.0, size=(samples, N_SENSORS)).astype(np.float32)
     base[:, S["bias"]] = 1.0
-    for name in ("energy", "age", "food_here", "food_strength", "hazard_near", "crowd"):
+    for name in ("energy", "age", "food_here", "food_strength", "hazard_near", "crowd",
+                 "neighbor_need"):
         base[:, S[name]] = rng.uniform(0.0, 1.0, samples)  # bu kanallar 0..1
     # Komsu HER IKI kosulda da var: tek degisen akrabalik olsun.
     base[:, S["near_agent"]] = 1.0

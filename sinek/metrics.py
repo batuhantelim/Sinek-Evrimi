@@ -48,6 +48,11 @@ BASE_COLUMNS = [
     "kin_bias_adj",       # enerji katmanli duzeltilmis fark  <-- guvenilen olcu
     "opp_kin",            # ornek buyuklugu: en yakini akraba olan ajan-adim
     "opp_nonkin",         # ornek buyuklugu: en yakini yabanci olan ajan-adim
+    "kin_expected",       # iyi karismis dunyada beklenen akraba-komsu orani
+    "kin_observed",       # gozlenen akraba-komsu orani
+    "kin_assortment",     # (gozlenen-beklenen)/(1-beklenen)  ~ Hamilton'un r'si
+    "bc_ratio",           # gerceklesen b/c (ham enerjide yapisal olarak <= 1)
+    "rescue_share",       # paylasimlarin kaci olmek uzere olan birine gitti
 ]
 
 
@@ -145,8 +150,16 @@ class Metrics:
             "behavior_diversity": _r(behavior_diversity(agents), 5),
             "weight_diversity": _r(weight_diversity(agents), 5),
         }
-        row.update(lineage_stats(agents))
+        lin = lineage_stats(agents)
+        row.update(lin)
         row.update(social_rates(sim.stats_step))
+        row.update(
+            kin_assortment(
+                sim.stats_step.get("opp_kin", 0),
+                sim.stats_step.get("opp_nonkin", 0),
+                lin.get("kin_expected", 0.0),
+            )
+        )
         means = genome_param_means(agents)
         for name in self.param_names:
             row[f"gp_{name}"] = _r(means.get(name, 0.0), 4)
@@ -302,6 +315,36 @@ def lineage_stats(agents) -> dict[str, float]:
         "lineage_count": len(counts),
         "lineage_effective": round(float(np.exp(entropy)), 3),
         "lineage_largest": round(float(p.max()), 4),
+        # Iyi karismis (uzamsal yapisiz) bir dunyada iki rastgele bireyin ayni
+        # soydan olma olasiligi. Assortment'in taban cizgisi.
+        "kin_expected": round(float((p * p).sum()), 5),
+    }
+
+
+def kin_assortment(opp_kin: float, opp_nonkin: float, expected: float) -> dict[str, float]:
+    """Akrabalarin MEKANSAL olarak ne kadar bir arada oldugu (~ Hamilton'un r'si).
+
+        assortment = (gozlenen - beklenen) / (1 - beklenen)
+
+    gozlenen = en yakin komsusu akraba olan ajan-adim orani
+    beklenen = ayni oran, dunya iyi karismis olsaydi (soy frekanslarinin kareleri)
+
+    0  : akrabalar rastgele dagilmis — akrabalik secilimi icin mekan avantaji yok
+    1  : komsular daima akraba
+
+    Faz 3 adim 1'de bu ~0 civarindaydi: baskin soy tum haritaya yayilmisti.
+    Hamilton kuralinin (r*b > c) r kolunu buyutmek istiyorsak once BUNU
+    buyutmek gerekir.
+    """
+    total = opp_kin + opp_nonkin
+    if total <= 0:
+        return {"kin_expected": round(expected, 5), "kin_observed": 0.0, "kin_assortment": 0.0}
+    observed = opp_kin / total
+    denom = 1.0 - expected
+    return {
+        "kin_expected": round(expected, 5),
+        "kin_observed": round(observed, 5),
+        "kin_assortment": round((observed - expected) / denom, 5) if denom > 1e-9 else 0.0,
     }
 
 
@@ -329,7 +372,16 @@ def social_rates(stats: dict) -> dict[str, float]:
         "kin_bias_adj": round(stratified_kin_bias(stats), 5),
         "opp_kin": int(opp_kin),
         "opp_nonkin": int(opp_non),
+        "bc_ratio": round(_ratio(stats.get("share_benefit", 0.0), stats.get("share_cost", 0.0)), 5),
+        "rescue_share": round(
+            _ratio(stats.get("share_rescue", 0), stats.get("share_events", 0)), 5
+        ),
     }
+
+
+def _ratio(num, den) -> float:
+    den = float(den)
+    return float(num) / den if den > 1e-12 else 0.0
 
 
 def stratified_kin_bias(stats: dict, buckets: int = 5) -> float:
