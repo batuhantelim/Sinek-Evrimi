@@ -15,7 +15,7 @@ pip install pygame                  # opsiyonel: canlı pencere
 ## Çalıştırma
 
 ```bash
-python run.py                       # config.yaml (Faz 3) ile koş, PNG kare kaydet
+python run.py                       # config.yaml (Faz 4) ile koş, PNG kare kaydet
 python run.py --viz pygame          # canlı pencere (SPACE duraklat, Q çık)
 python run.py --steps 1000 --viz none
 python run.py --check-determinism
@@ -49,6 +49,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 3 — sağlamlık | 5 seed'de tekrar (yön sağlam, büyüklük oynak) | ✅ |
 | 3 — eksen A | Dış-grup bolluğu düşmanlığı tetiklemiyor | ✅ |
 | 3 — eksen B | Kıtlık da saldırıyı artırmıyor; H1 ve H2 reddedildi | ✅ |
-| 4 | Doğal avcı, melez soyisim, soy-arası ilişki matrisi | ⏳ |
+| 4 — adım 1 | Doğal avcı (grup-kör): düşmanlık da sürü işbirliği de çıkmadı | ✅ |
+| 4 — adım 2 | Melez soyisim, soy-arası matris, gruplar arası rekabet | ⏳ |
 
-Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/)
+Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/)

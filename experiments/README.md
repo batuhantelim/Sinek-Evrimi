@@ -2,7 +2,9 @@
 
 Her dosya `config.yaml` uzerine bindirilir; sadece degistirdigi anahtarlari
 icerir. `config.yaml` her zaman **en guncel fazin** varsayilanini tasir
-(su an Faz 3), onceki fazlar buradan yeniden uretilir.
+(su an Faz 4), onceki fazlar buradan yeniden uretilir. Faz 1/2/3 dosyalari
+`rules.predator.enabled: false` tasir: varsayilan ilerledi diye eski bir
+deney sessizce baska bir deneye donusmemeli.
 
 ```bash
 python run.py --config experiments/<dosya>.yaml
@@ -21,6 +23,10 @@ python run.py --config experiments/<dosya>.yaml
 | `faz3_azalan_kontrol.yaml` | Ayni rejim + soyisim karistirma kontrolu |
 | `faz3b_saldiri.yaml` | **Adim 2:** saldiri acik, dort hucreli in/out olcumu |
 | `faz3b_kontrol.yaml` | Adim 2 karistirma kontrolu |
+| `faz4_avci.yaml` | **Faz 4 adim 1:** dogal avci (ortak, dissal, GRUP-KOR) |
+| `faz4_avci_kontrol.yaml` | Avcili kolun karistirma kontrolu |
+| `faz4_avcisiz.yaml` | Avcisiz taban kol (2x2'nin ucuncu hucresi) |
+| `faz4_avcisiz_kontrol.yaml` | Avcisiz karistirma kontrolu |
 
 Tek seferlik degisiklikler icin dosya acmaya gerek yok:
 

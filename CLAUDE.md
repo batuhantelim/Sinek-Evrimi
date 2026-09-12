@@ -36,9 +36,10 @@ davranış oradan **türer**.
 | **Faz 3 — sağlamlık** | 5 seed'de tekrar; yön sağlam, büyüklük oynak | ✅ **tamam** |
 | **Faz 3 — eksen A** | Dış-grup bolluğu düşmanlığı tetiklemiyor; adım 2 daraltıldı | ✅ **tamam** |
 | **Faz 3 — eksen B** | Kıtlık saldırıyı hiç artırmadı; H2 de reddedildi | ✅ **tamam** |
-| **Faz 4** | Doğal avcı, melez soyisim, soy-arası ilişki matrisi | ⏳ |
+| **Faz 4 — adım 1** | Doğal avcı (grup-kör); düşmanlık da sürü işbirliği de çıkmadı | ✅ **tamam** |
+| **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
-`config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 3).
+`config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 4).
 Önceki fazlar `experiments/` altındaki hazır konfigürasyonlarla tek komutta
 yeniden üretilir.
 
@@ -62,6 +63,7 @@ sinek/
   genome.py             Genom (params + weights + soyisim) + gaussian mutasyon
   physics.py            Sıcak yol için dondurulmuş fizik sabitleri
   spatial.py            Uzamsal hash (Faz 3 ikili etkileşimleri için)
+  predator.py           Faz 4: ortak, dışsal, GRUP-KÖR avcı sürüsü
   persistence.py        Popülasyonu npz olarak kaydet/yükle
   simulation.py         Adım döngüsü + nesil döngüsü + seçilim
   metrics.py            Metrik toplama + CSV (adım ve nesil bazlı)
@@ -75,7 +77,9 @@ tools/kin_probe.py      Akrabalık sensörü sondası: beyin akrabalığı okuyo
 tools/sweep_hamilton.py Hamilton kuralı rejim taraması (her rejim + kontrolü)
 tools/parochial_report.py  Dört hücreli in/out matrisi + birlikte hareket
 tools/seed_sweep.py     Adım 2'yi çok seed'de tekrarlar (tekrarlanabilirlik tablosu)
-tests/                  unittest — determinizm + Faz 1 + Faz 2 testleri
+tools/env_sweep.py      Çevresel tarama (eksen A: dış-grup bolluğu, eksen B: kıtlık)
+tools/predator_sweep.py Faz 4 avcı 2×2 taraması + D/Ç sınıflandırması
+tests/                  unittest — determinizm + faz testleri + araç/yöntem testleri
 ```
 
 ### Sensör/motor sözleşmesi
@@ -83,14 +87,15 @@ tests/                  unittest — determinizm + Faz 1 + Faz 2 testleri
 Beden ile beyin arasındaki **tek** bağ iki vektördür:
 
 ```
-sensors (13 float) ──► Brain.act() ──► motors (4 float)
+sensors (19 float) ──► Brain.act() ──► motors (5 float)
 ```
 
 ```python
 SENSOR_NAMES = [bias, energy, age, food_here, food_fwd, food_left,
                 food_strength, hazard_fwd, hazard_left, hazard_near,
                 mate_fwd, mate_left, crowd,
-                kin, near_agent]                    # Faz 3
+                kin, near_agent, neighbor_need,     # Faz 3
+                pred_fwd, pred_left, pred_near]     # Faz 4
 MOTOR_NAMES  = [turn, thrust, eat, share, attack]   # Faz 3
 ```
 
@@ -340,6 +345,56 @@ matematiksel olarak imkânsız) ham `kin_bias` **+3.80 puan** çıkıyor.
 
 ---
 
+## 3.6 Faz 4 adım 1: doğal avcı
+
+### Avcı grup-kör olmak ZORUNDA
+
+`PredatorPack._nearest` hedefini **yalnızca mesafeye** göre seçer; soyisme,
+enerjiye, yaşa bakmaz. Belirli bir soyu hedefleseydi grup düşmanlığını elle
+kurmuş, yani Faz 3'ün 1. kuralını (rol/kast kodlanmaz) ihlal etmiş olurduk.
+`tests/test_phase4.py::test_predator_target_is_group_blind` soyisimleri
+karıştırıp hedefin değişmediğini doğrular.
+
+### Sürüleşme kodlanmaz, kârlı hale getirilir
+
+Avcı başına adımda **tek vuruş** + bekleme süresi (`cooldown`). N kişilik bir
+kümede vurulan olma olasılığınız 1/N'e düşer — seyreltme (dilution / selfish
+herd). "Avcı gelince gruplaş" diye bir kural yoktur; gruplaşma yalnızca
+kârlı hale gelir, seçilim bulursa bulur.
+
+Avcı ajanlar **hareket ettikten sonra** vurur (`simulation.step` 3.6): kaçmanın
+bir anlamı olsun diye.
+
+### ⚠ Kalibrasyonu deneyin TAM UFKUNDA yapın
+
+Avcı gücü önce 1500 adımda kalibre edildi (20 avcı → ölümlerin %23'ü, koloni
+tavanda sağlıklı). 12000 adımda aynı ayar **karıştırma kontrolünü tüketti**
+(9873. adımda 700 → 0) ve dış-grup fırsat payını %2.7'ye düşürdü. Kısa
+kalibrasyon eksik değil, **yanıltıcıydı**.
+
+Yeniden kalibrasyon, sonuç görülmeden ilan edilmiş üç ölçütle yapıldı — ikisi
+doğrudan **ölçülebilirliği** korur:
+
+1. hem asıl kol hem karıştırma kontrolü tam süreyi yaşar,
+2. son çeyrekte dış-grup fırsat payı ≥ %10,
+3. ölümlerin ≥ %10'u avcıya bağlanır.
+
+Bunları birden sağlayan en güçlü baskı seçilir (seed 42'de 12 avcı).
+
+### 2×2 tasarım
+
+| | gerçek etiket | karıştırma kontrolü |
+|---|---|---|
+| **avcı var** | `faz4_avci` | `faz4_avci_kontrol` |
+| **avcı yok** | `faz4_avcisiz` | `faz4_avcisiz_kontrol` |
+
+Her kolun ayrımcılığı **kendi** kontrolüne karşı okunur; iki `t` ancak ondan
+sonra kıyaslanır. `tools/predator_sweep.py` bunu yapar ve iki ölçüm hatasını
+yüksek sesle bayraklar: kontrol erken bittiyse ("OKUNMAZ") ve dış-grup payı
+%10'un altındaysa ("GÜRÜLTÜ").
+
+---
+
 ## 4. Nasıl çalıştırılır
 
 ```bash
@@ -350,7 +405,7 @@ python run.py --steps 2000 --viz none    # sadece metrik, en hızlısı
 python run.py --viz pygame               # canlı pencere (SPACE: duraklat, Q: çık)
 python run.py --seed 7 --name deney7
 python run.py --check-determinism
-python -m unittest discover -s tests     # 31 test
+python -m unittest discover -s tests     # 92 test
 ```
 
 Hazır deneyler (`experiments/README.md`):
@@ -360,6 +415,20 @@ python run.py --config experiments/faz1_klonlar.yaml              # Faz 1 taban 
 python run.py --config experiments/faz2_kontrol_secilimsiz.yaml   # seçilimsiz kontrol
 python run.py --config experiments/faz2_surekli.yaml              # sürekli evrim
 python run.py --config experiments/faz2_kitlik.yaml               # kıtlık
+python run.py --config experiments/faz3b_saldiri.yaml             # Faz 3 adım 2
+python run.py --config experiments/faz4_avci.yaml                 # Faz 4 doğal avcı
+```
+
+Faz 4'ün 2×2'si (dört kol da Faz 2 tohumuyla, her biri kendi kontrolüyle):
+
+```bash
+for k in avci avci_kontrol avcisiz avcisiz_kontrol; do
+  python run.py --config experiments/faz4_$k.yaml \
+    --load-genomes docs/faz2/population.npz --seed 42 --viz none
+done
+python tools/predator_sweep.py --from-runs \
+  runs/faz4_avci runs/faz4_avci_kontrol runs/faz4_avcisiz runs/faz4_avcisiz_kontrol \
+  --seed-label 42
 ```
 
 Çıktılar `runs/<name>/`:
@@ -437,6 +506,8 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `hostility_rate` | saldırı / fırsat |
 | `attack_in_group`, `attack_out_group` | `P(saldır \| akraba)`, `P(saldır \| yabancı)` |
 | `attack_kin_bias`, `attack_kin_bias_adj` | saldırıda akrabalık ayrımcılığı (ham / düzeltilmiş) |
+| `death_predator`, `predator_strikes`, `predator_kills` | avcı muhasebesi |
+| `predation_risk` | kişi başı avlanma baskısı (öldürme / ajan) |
 | `gp_<parametre>` | her genom parametresinin popülasyon ortalaması — evrimin **yönü** |
 | `cooperation_rate` | Faz 3 için ayrılmış |
 
@@ -444,7 +515,12 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 
 `generation, step, pool, survivors, mean_fitness, median_fitness, max_fitness,
 mean_age, mean_food_eaten, best_food_eaten, behavior_diversity,
-weight_diversity, gp_<parametre>...`
+weight_diversity, food_fill, population, clustering, deaths, births,
+death_predator, predator_strikes, predator_kills, predation_risk,
+lineage_*, coop_*, attack_*, kin_*, opp_*, gp_<parametre>...`
+
+Faz 4'te `clustering` ve avcı sütunları dönem satırına taşındı: **yan etkiler
+ölçülmeden** "avcı şunu üretti" denemez.
 
 ---
 
@@ -597,6 +673,34 @@ Tam tablo: **[docs/faz3/eksenB_kitlik.md](docs/faz3/eksenB_kitlik.md)**
 - ⚠ **Ara raporda verdiğim "düşük assortment → yabancıya" örüntüsü yanlıştı.**
   `B_cok_kit` assortment 0.216 (en düşük) ile **kör**. Örüntü yok.
 
+### Faz 4 adım 1 — doğal avcı (3 seed × 2×2, her kol kendi kontrolüyle)
+
+Tam tablo: **[docs/faz4/adim1_avci.md](docs/faz4/adim1_avci.md)**
+
+- **Avcı dış-grup düşmanlığı ÜRETMEDİ.** `atk_t` avcılı kolda −3.55, avcısız
+  kolda −5.52 — avcı altında saldırı yabancıya *daha az* yöneliyor. Saldırı
+  seviyesi de 3 seed'in yalnızca birinde arttı ve orada akrabalığa **kör**
+  kaldı (D/Ç: Ç, ayrım gütmeyen artış).
+- **In-grup ayrımcılığını güçlendirmedi; SİLDİ.** Paylaşım patlıyor (seed 42:
+  %6.9 → %97.1) ama **in ile dış eşit** (%97.8). Aynı patlama etiketin
+  bilgisiz olduğu kontrolde de var (%2.6 → %53.5) → süren şey akrabalık değil
+  **yoğunluk**. `share_t` avcılı +4.46, avcısız +7.35. Nedensel sonda da aynı
+  yönde: paylaşım farkı avcılı kolda +0.0087, avcısız kolda +0.0548.
+- **Fedakârlık ile düşmanlık avcı altında BAĞLANMADI.** Dönemler arası
+  `coop_in × attack_out` r: avcılı −0.24, avcısız +0.01; işaret seed'den
+  seed'e dönüyor ve karıştırma kontrolünde de benzer değerler çıkıyor.
+- **Koloni iki kararlı rejim arasında salınıyor**: "seyrek toplayıcı"
+  (işbirliği <%20, doluluk ~0.25) ve "yoğun paylaşım yumağı" (işbirliği >%50,
+  toplayıcılık düşük). Yumak rejimi avcısız kollarda ve bilgisiz kontrollerde
+  de çıkıyor; koşumlar arası büyüklük farkının çoğunu avcı değil bu **havza
+  seçimi** açıklıyor. 20 avcılı partide kontrolün tükenmesi bunun uç hâliydi.
+- **Faz 3 adım 2'nin seed 42 "saldırı kör" bulgusu tekrarlanmadı**: sensör
+  sözleşmesi 16 → 19'a çıkınca aynı seed'in avcısız kolu `atk_t = −10.43`
+  veriyor. Eksen A'nın uyarısı bir kez daha doğrulandı.
+- Yan etkiler (avcılı vs avcısız, seed 42): kümelenme 0.474 → 0.989, etkin soy
+  9.53 → 2.81, dış-grup payı %57.9 → %22.8, yemek doluluğu 0.239 → 0.883.
+  Avcı yalnızca tehdit eklemiyor; bunlardan ikisi **ölçümün kendisini** bozuyor.
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -623,24 +727,27 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
 
 ---
 
-## 7. Faz 4'e geçerken yapılacaklar
+## 7. Faz 4 adım 2'ye geçerken yapılacaklar
 
-1. **Doğal avcı**: dünyaya hareketli tehdit. `rules` altında ayrı bir blok;
-   `world.hazard` sabit disklerin aksine ajanları takip eder. Gruplar arası
-   ortak tehdit, adım 2'de çıkmayan **grup-dışı düşmanlığın** literatürdeki
-   tetikleyicisidir — asıl test bu olabilir.
-2. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
+1. ✅ **Doğal avcı** eklendi (`sinek/predator.py`, `rules.predator`). Sonuç:
+   düşmanlık da sürü işbirliği de çıkmadı — avcı tek başına literatürdeki
+   tetikleyicinin yalnızca yarısıymış. Eksik olan **gruplar arası rekabet**:
+   ortak tehdit kaynak paylaşmıyor, bir soyun kazancı diğerinin kaybı değil.
+   Bunu eklemeden parochial düşmanlık beklenmemeli.
+2. **Rejim bistabilitesi** önce anlaşılmalı. Koloni "seyrek toplayıcı" ile
+   "yoğun paylaşım yumağı" arasında salınıyor ve bu salınım avcının etkisini
+   gömüyor. Hangi koşulun hangi havzaya ittiği süpürülmeden yeni bir mekanik
+   eklemek, ölçülemeyen bir şeyin üstüne ölçülemeyen bir şey koymaktır.
+3. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
    etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
    etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
    değiştirmek bu kodu bozmaz — kısmi akrabalık isteniyorsa
    `agent.sense`'teki `kin` hesabı sürekli bir orana çevrilir.
-3. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
+4. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
    `(soy_i, soy_j)` matrisine genişletilecek. `stratified_kin_bias`
    `action` parametresiyle zaten genel; hücre başına da uygulanabilir.
-4. **Gruplar arası rekabet** eklenmeden parochial düşmanlık beklenmemeli
-   (bkz. adım 2 sonucu).
-5. Adım 2'nin kazananlarıyla başlamak:
-   `python run.py --load-genomes runs/faz3b_saldiri/population.npz`
+5. Faz 4 adım 1'in kazananlarıyla başlamak:
+   `python run.py --load-genomes docs/faz4/population.npz`
 
 ---
 
@@ -693,4 +800,20 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
   çürüttü. Örüntü iddiası ancak tüm koşullar bitince yazılır.
 - **Bir aracın rejimi bir deney dosyasını taklit ediyorsa test edin.**
   `test_seed_sweep_regime_matches_step2` ikisi ayrışırsa kırmızıya döner.
+- **Kalibrasyonu deneyin TAM UFKUNDA yapın.** Avcı gücü 1500 adımda sağlıklı
+  görünüp 12000 adımda karıştırma kontrolünü tüketti. Kısa kalibrasyon eksik
+  değil, yanıltıcıdır.
+- **Ölçütü sonucu görmeden ilan edin.** Avcı sayısı, üç önceden yazılmış
+  ölçütle seçildi (kontrol yaşar / dış-grup payı ≥ %10 / avcıya bağlı ölüm
+  ≥ %10). Aksi halde parametre, istenen sonucu verene kadar ayarlanmış olur.
+- **Kontrolü ölmüş bir koldan sonuç okumayın.** `predator_sweep` bunu ve
+  dış-grup payının %10'un altına düşmesini yüksek sesle bayraklar; iki durumda
+  da o kol OKUNMAZ.
+- **Doygun rejimden ayrımcılık okumayın.** In ve dış birlikte %97'ye
+  çıktığında dört hücreli matris tavan etkisiyle ayrımı gizler; `share_t`
+  (dönem bazlı, kontrole karşı) ve nedensel sonda ayrıca bakılmalıdır.
+- **Faz sınırı değiştiğinde eski deney dosyalarını sabitleyin.** `config.yaml`
+  Faz 4'e ilerleyince Faz 1/2/3 deney dosyalarına ve `seed_sweep.REGIME`'e
+  `rules.predator.enabled=false` eklendi; yoksa eski fazlar sessizce başka bir
+  deneye dönüşürdü. Test bunu tutar (`TestPredatorArms`).
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.

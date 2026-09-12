@@ -1,0 +1,45 @@
+========================================================================================================
+FAZ 4 ADIM 1 — AVCI 2x2 (3 seed; her kol KENDI karistirma kontroluyle)
+  dort hucre: son ceyrek, firsata kosullu | kin_adj/atk_adj: son yari, yuzde puan
+  r: in-grup paylasim x dis-grup saldiri (donem-donem); rk ayni sey KONTROLDE
+========================================================================================================
+
+seed 7  (0 sn)
+  kol           pay ic    pay dis    sal ic    sal dis | kin_adj      t | atk_adj      t |     r    rk
+  avci          91.84%     86.60%     4.86%      6.42% |   -2.91  -0.89 |   -0.48  -0.52 | +0.48 +0.48
+  avcisiz       69.32%     16.59%     1.81%      9.07% |  +41.58 +12.19 |   -5.25  -8.46 | +0.65 +0.61
+    yan etki : assortment 0.712 -> 0.706 | kumelenme +0.957 -> +0.993 | doluluk 0.464 -> 0.841 | pop 700 -> 700
+    ornek    : opp_kin 190240->269967, opp_dis 56795->44318 (dis pay %23.0->%14.1), etkin soy 8.5->2.5
+    avlanma  : olumlerin %16.0'i avciya (donem basina 88 oldurme)
+    D/C      : C — saldiri arttı (%5.14) ama akrabaliga KOR (atk_t -0.52): hedef ayrimi yok, ayrim gutmeyen bir artis
+
+seed 42  (0 sn)
+  kol           pay ic    pay dis    sal ic    sal dis | kin_adj      t | atk_adj      t |     r    rk
+  avci          97.05%     97.80%     0.84%      0.56% |  +15.09  +2.32 |   -0.38  -1.42 | -0.60 +0.16
+  avcisiz        6.93%      2.64%     1.49%      3.00% |   +3.93  +6.96 |   -1.53 -10.43 | -0.74 -0.79
+    yan etki : assortment 0.286 -> 0.582 | kumelenme +0.487 -> +0.976 | doluluk 0.241 -> 0.734 | pop 700 -> 700
+    ornek    : opp_kin 74141->224665, opp_dis 104177->66291 (dis pay %58.4->%22.8), etkin soy 11.4->4.5
+    avlanma  : olumlerin %17.5'i avciya (donem basina 84 oldurme)
+    D/C      : ARTMADI — saldiri %0.77, avcisiz kolda %2.36 (D/C sorusu dusmuyor); ama YON: dis/ic 0.66x, atk_t -1.42
+
+seed 123  (0 sn)
+  kol           pay ic    pay dis    sal ic    sal dis | kin_adj      t | atk_adj      t |     r    rk
+  avci          23.10%      8.62%     1.42%      2.39% |  +15.96 +11.94 |   -1.17  -8.72 | -0.61 -0.18
+  avcisiz       87.29%     83.44%     2.06%      1.49% |   +9.89  +2.91 |   +1.54  +2.34 | +0.12 -0.40
+    yan etki : assortment 0.685 -> 0.308 | kumelenme +0.715 -> +0.490 | doluluk 0.375 -> 0.269 | pop 700 -> 700
+    ornek    : opp_kin 124220->93991, opp_dis 26248->89594 (dis pay %17.4->%48.8), etkin soy 4.5->6.5
+    avlanma  : olumlerin %16.7'i avciya (donem basina 122 oldurme)
+    D/C      : ARTMADI — saldiri %1.82, avcisiz kolda %2.05 (D/C sorusu dusmuyor); ama YON: dis/ic 1.69x, atk_t -8.72
+
+========================================================================================================
+UC SORU
+========================================================================================================
+  S1 dis-grup dusmanlik  : atk_t avcili -3.55, avcisiz -5.52 (fark +1.97)
+       kararlar avcili   : {'yabanciya': 1, 'akrabaya': 0, 'kor': 2}
+       kararlar avcisiz  : {'yabanciya': 2, 'akrabaya': 1, 'kor': 0}
+  S2 in-grup isbirligi   : share_t avcili +4.46, avcisiz +7.35 (fark -2.90)
+       kumelenme         : +0.720 -> +0.820 (fark +0.100)
+  S3 fedakarlik x dusmanlik birlikte mi: r avcili -0.24, avcisiz +0.01
+       kontrolde (yapaylik sinamasi): avcili +0.15
+
+  taban (Faz 3 adim 2): saldiri %4.42, kin_bias_adj +28.02 puan

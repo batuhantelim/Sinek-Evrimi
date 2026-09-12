@@ -1,0 +1,22 @@
+== OZET (1074.9 s, 9873 adim, 108.9 ms/adim) ==
+  adim              : 1 -> 9873
+  populasyon        : baslangic 297, son 0, tepe 700, dip 0
+  ortalama enerji   : ilk yari 115.7, son yari 130.6
+  toplam dogum      : 14561
+  toplam olum       : 14861 (aclik 3495, tehlike 727, yaslilik 4064)
+  en uzun soy zinciri: 0 nesil
+  yemek doluluk     : baslangic 0.600, son 0.998
+  kumelenme indeksi : 0.847
+  davranis cesitliligi: 0.00000   (klonlar)
+  agirlik cesitliligi : 0.00000
+
+  --- EVRIM (19 nesil, mod: steady_state) ---
+  ort. fitness      : nesil 0 -> 18: 519.9 -> 475.8
+  ilk/son ucte bir  : 487.9 -> 481.5  (-1.3%)
+  en iyi fitness    : 1929.8
+  ort. yenen yemek  : 19.17 -> 0.00
+  genom kaymasi — beynin OKUDUGU parametreler:
+    wander             +0.442 -> +0.432  (-0.010)
+  notr suruklenme   : 9 parametre (bu beyin okumuyor; en cok panic_speed -0.874) -> yerlesik drift referansi
+  nesil CSV         : /home/user/Sinek-Evrimi/runs/faz4_avci_kontrol/generations.csv
+  metrik CSV        : /home/user/Sinek-Evrimi/runs/faz4_avci_kontrol/metrics.csv
