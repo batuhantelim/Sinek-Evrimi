@@ -405,9 +405,17 @@ class Simulation:
         acc = self._epoch_acc if self.mode != "generational" else self.stats_total
         row.update(social_rates(acc))
         # Faz 4 avlanma muhasebesi + koloni sagligi (D/C ayrimi bunlara bakar).
-        for key in ("deaths", "births", "death_predator", "predator_strikes",
-                    "predator_kills"):
+        for key in ("deaths", "births", "death_starved", "death_predator",
+                    "predator_strikes", "predator_kills"):
             row[key] = int(acc.get(key, 0))
+        # KISI BASI hizlar. `food_fill` bir ORANDIR ve kapasiteye bagimlidir;
+        # kosullar arasi kiyaslanamaz (eksen B dersi). Bunlar ajan-adim basina
+        # mutlak buyukluklerdir: "koloni topluyor mu, yoksa enerjiyi yalnizca
+        # aralarinda mi dolastiriyor" sorusu ancak bu ikisiyle sorulabilir.
+        window = self.step_index if self.mode == "generational" else self.epoch_length
+        denom = max(1, len(self.agents)) * max(1, window)
+        row["forage_per_capita"] = round(acc.get("food_eaten", 0.0) / denom, 6)
+        row["share_per_capita"] = round(acc.get("share_energy", 0.0) / denom, 6)
         row["predation_risk"] = round(
             acc.get("predator_kills", 0) / max(1, len(self.agents)), 5
         )

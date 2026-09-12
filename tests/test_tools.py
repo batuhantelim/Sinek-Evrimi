@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 from sinek.config import load_config  # noqa: E402
 
+import basin_map  # noqa: E402
 import env_sweep  # noqa: E402
 import predator_sweep  # noqa: E402
 import seed_sweep  # noqa: E402
@@ -230,6 +231,56 @@ class TestPredatorHostilityClassifier(unittest.TestCase):
         self.assertEqual(kind, "artmadi")
         self.assertIn("YON", why)
         self.assertIn("5.00x", why)
+
+
+class TestBasinMap(unittest.TestCase):
+    """Havza haritalamanin iddiasi: 'avci kapali, rejim Faz 3/4 ile ayni,
+    yalnizca seed degisiyor'. Rejim deney dosyasindan ayrisirsa tani baska bir
+    deneyi olcer."""
+
+    def test_regime_matches_the_predator_free_arm(self):
+        from_tool = load_config(
+            overrides=seed_sweep.FIXED + seed_sweep.REGIME + [basin_map.PREDATOR_OFF]
+        ).to_dict()
+        from_file = load_config(
+            os.path.join(ROOT, "experiments", "faz4_avcisiz.yaml")
+        ).to_dict()
+        self.assertEqual(_mechanics(from_tool), _mechanics(from_file))
+
+    def test_predator_is_off(self):
+        cfg = load_config(
+            overrides=seed_sweep.FIXED + seed_sweep.REGIME + [basin_map.PREDATOR_OFF]
+        )
+        self.assertFalse(cfg.rules.predator.enabled)
+
+    def test_threshold_comes_from_the_data_not_a_constant(self):
+        """Esik en buyuk boslugun ORTASI olmali; veri kayinca esik de kaymali."""
+        low = [0.10, 0.11, 0.12]
+        high = [0.50, 0.51, 0.52]
+        info = basin_map.largest_gap_threshold(np.array(low + high))
+        self.assertAlmostEqual(info["threshold"], 0.31, places=6)
+        info2 = basin_map.largest_gap_threshold(np.array(low + [h + 1.0 for h in high]))
+        self.assertAlmostEqual(info2["threshold"], 0.81, places=6)
+
+    def test_flat_spread_is_not_called_bimodal(self):
+        """Duz bir yelpazede en buyuk bosluk ikincisine yakin olmali (oran ~1)."""
+        flat = np.linspace(0.1, 0.5, 12)
+        info = basin_map.largest_gap_threshold(flat)
+        self.assertLess(info["gap_ratio"], 2.0)
+        self.assertLess(info["spread_share"], 0.25)
+
+    def test_clear_split_is_called_bimodal(self):
+        info = basin_map.largest_gap_threshold(
+            np.array([0.10, 0.11, 0.12, 0.13, 0.60, 0.61, 0.62, 0.63])
+        )
+        self.assertGreaterEqual(info["gap_ratio"], 2.0)
+        self.assertGreaterEqual(info["spread_share"], 0.25)
+        self.assertEqual((info["n_low"], info["n_high"]), (4, 4))
+
+    def test_classify_labels_low_forage_as_huddle(self):
+        rows = [{"forage": v} for v in (0.02, 0.03, 0.40, 0.41)]
+        _info, labels = basin_map.classify(rows, "forage")
+        self.assertEqual(labels, ["yumak", "yumak", "toplayici", "toplayici"])
 
 
 class TestSweepStatistics(unittest.TestCase):
