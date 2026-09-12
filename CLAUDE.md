@@ -34,6 +34,8 @@ davranış oradan **türer**.
 | **Faz 3 — adım 1.5** | Hamilton kuralı `r·b/c` taraması; yapısal engelin bulunması | ✅ **tamam** |
 | **Faz 3 — adım 2** | `attack` + dört hücreli in/out analizi | ✅ **tamam** |
 | **Faz 3 — sağlamlık** | 5 seed'de tekrar; yön sağlam, büyüklük oynak | ✅ **tamam** |
+| **Faz 3 — eksen A** | Dış-grup bolluğu düşmanlığı tetiklemiyor; adım 2 daraltıldı | ✅ **tamam** |
+| **Faz 3 — eksen B** | Kaynak kıtlığı × saldırganlık (kasıtlı yemek süpürmesi) | ⏳ sıradaki |
 | **Faz 4** | Doğal avcı, melez soyisim, soy-arası ilişki matrisi | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 3).
@@ -519,15 +521,14 @@ Dört hücreli matris (son çeyrek, fırsata koşullu):
 - **Grup-içi fedakârlık evrimleşti.** Paylaşım in/out oranı ×2.6; düzeltilmiş
   ayrımcılık +28…+57 puan, kontrolde +0.3…+1.1 (≈50× fark). Kontrolün dört
   hücresi birbirinin aynı — kontrol tam olarak yapması gerekeni yaptı.
-- **Grup-dışı düşmanlık EVRİMLEŞMEDİ.** Saldırı in-grupta biraz daha yüksek
-  (%5.10 vs %3.84); düzeltilmiş saldırı ayrımcılığı kararsız (−2.6 … +3.5) ve
-  paylaşımdan ~20× küçük. Saldırı oranı **kontrolde de birebir aynı şekilde**
-  yükseliyor (1.3% → 4.1%): saldırı bir strateji olarak evrimleşiyor ama
-  **akrabalığa kör**.
-- **"İyilik ve öteki'ne kötülük aynı madalyonun iki yüzü" — bu kurulumda
-  değil.** Sebep: saldırının kârlılığı hedefin akrabalığına değil
-  **zenginliğine** bağlı (maliyet sabit, kazanç hedefin enerjisiyle sınırlı).
-  Ayrıca komşuların %84'ü akraba; yabancı zaten nadir.
+- **Grup-dışı düşmanlık bu rejimde evrimleşmedi.** Saldırı in-grupta biraz
+  daha yüksek (%5.10 vs %3.84); düzeltilmiş ayrımcılık kararsız ve
+  paylaşımdan ~20× küçük. Saldırı oranı kontrolde de aynı şekilde yükseliyor.
+  ⚠ **DÜZELTME (eksen A):** bu, *bu taban rejime özgüymüş*. Dünya
+  parametreleri oynatıldığında 12 koşumun 10'unda saldırı yabancıya yöneldi;
+  kör kalan tek koşul dokunulmamış taban rejimdi. "Bu kurulumda düşmanlık
+  evrimleşmiyor" genellemesi fazla genişti — bkz.
+  [docs/faz3/eksenA_disgrup_bollugu.md](docs/faz3/eksenA_disgrup_bollugu.md).
 - Sonda yine simülasyon içi ölçüden **zayıf** çıkıyor (paylaşımda %61.0 vs
   kontrol %56.6). Sonda rastgele sensör uzayında ortalama duyarlılık ölçer;
   gerçek koşumda beyin dar bir bölgede çalışır. İkisi ayrı raporlanır.
@@ -554,6 +555,25 @@ Tam tablo: **[docs/faz3/adim2_seed_taramasi.md](docs/faz3/adim2_seed_taramasi.md
   5 nokta üzerinde korelasyon 0.900, ama 2024 çıkarılınca −0.087 — yani
   korelasyon tek noktaya dayanıyor. Sınamak için dış-grup fırsat payını
   doğrudan süpüren bir tarama gerekir.
+
+### Faz 3 eksen A — dış-grup bolluğu (6 koşul × 2 seed, her biri kontrolüyle)
+
+Tam tablo: **[docs/faz3/eksenA_disgrup_bollugu.md](docs/faz3/eksenA_disgrup_bollugu.md)**
+
+- **H1 reddedildi.** Dış-grup fırsat payı ile saldırı ayrımcılığı arasında
+  ilişki yok (r = −0.133, R² = 0.018). En güçlü düşmanlık (`atk_t` −18.04)
+  en DÜŞÜK dış-grup payına (%4.8) sahip koşumda.
+- **Adım 2'nin "saldırı akrabalığa kör" bulgusu taban rejime özgü.**
+  12 koşumun 10'u (5 farklı koşulun hepsi) yabancıya yöneldi; kör kalan tek
+  koşul `A1_taban`. Ölçüm yanlış değildi, genelleme fazla genişti.
+- **Eşik hikâyesi yok.** `A1_taban`/s42 (assortment 0.767) kör,
+  `A2_tam_karisma`/s42 (0.768) yabancıya — aynı assortment, zıt karar.
+- **Kendi taramamda konfound:** eksen A kaldıraçları yemek dengesini de
+  oynattı (%22.7–%49.4) ve yemek doluluğu `atk_t`'nin en güçlü tek
+  yordayıcısı çıktı (+0.502). Eksen B artık kasıtlı süpürülmeli.
+- Çoklu regresyon (n=12, 3 tahminci, R² = 0.424) zayıf; tahminciler arası
+  bağımlılık yüksek (dış-grup ~ soy +0.875). Söylenebilecek tek net şey
+  H1'in reddi.
 
 ### Kalibrasyon notları
 
@@ -633,6 +653,14 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
 - **Tek seed sonuç değildir.** Bir bulguyu rapor etmeden önce
   `tools/seed_sweep.py` ile birkaç seed'de tekrarlayın: Faz 3'te yön 5/5
   tuttu ama büyüklükler 3–5× aralıkta oynadı.
+- **Tek rejim de sonuç değildir.** Adım 2 "saldırı akrabalığa kör" dedi ve
+  5 seed'de tekrarlandı — ama rejim biraz oynatılınca 10/12 koşumda tersine
+  döndü. Bir negatifi genellemeden önce `tools/env_sweep.py` ile çevreyi
+  süpürün.
+- **Kaldıracınızın ne yaptığını ÖLÇÜN.** Eksen A'da `split_rate`'i düşürmek
+  dış-grup payını yükseltti (beklentinin tersi) ve kaldıraçlar yemek
+  dengesini de oynattı. Tarama koşullarında niyetlenen değişkenin yanında
+  yan etkileri de kaydedin (`kin_assortment`, `food_fill`, `opp_*`).
 - **Bir aracın rejimi bir deney dosyasını taklit ediyorsa test edin.**
   `test_seed_sweep_regime_matches_step2` ikisi ayrışırsa kırmızıya döner.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.
