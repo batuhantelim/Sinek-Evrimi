@@ -39,6 +39,7 @@ from .physics import Physics
 from .predator import PredatorPack
 from .metrics import (
     behavior_diversity,
+    clustering_index,
     genome_param_means,
     kin_assortment,
     lineage_stats,
@@ -394,11 +395,22 @@ class Simulation:
                 self.world.food_total / max(1e-9, self.world.food_capacity_total), 5
             ),
             "population": len(self.agents),
+            # Faz 4: surulesme (dilution'in davranissal izi) donem satirinda
+            # da dursun — avcinin YAN ETKILERINI olcmeden "avci dusmanlik
+            # uretti" denemez.
+            "clustering": round(clustering_index(self), 5),
         }
         lin = lineage_stats(self.agents)
         row.update(lin)
         acc = self._epoch_acc if self.mode != "generational" else self.stats_total
         row.update(social_rates(acc))
+        # Faz 4 avlanma muhasebesi + koloni sagligi (D/C ayrimi bunlara bakar).
+        for key in ("deaths", "births", "death_predator", "predator_strikes",
+                    "predator_kills"):
+            row[key] = int(acc.get(key, 0))
+        row["predation_risk"] = round(
+            acc.get("predator_kills", 0) / max(1, len(self.agents)), 5
+        )
         # NOT: firsat sayimlari donem boyunca birikir, soy dagilimi ise donem
         # SONUNDAKI anlik durumdur. Yavas degisen bir buyukluk oldugu icin
         # kabul edilebilir bir yaklasiklik.

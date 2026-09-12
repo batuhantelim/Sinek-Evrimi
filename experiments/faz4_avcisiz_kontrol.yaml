@@ -1,0 +1,29 @@
+# FAZ 4 adım 1 AVCISIZ KONTROL — avcı KAPALI + soyisim karıştırma.
+#
+# 2x2 tasarımın dördüncü hücresi: {avcı var/yok} x {gerçek etiket/karıştırma}.
+# Avcılı kolun ayrımcılığı kendi kontrolüne, avcısız kolunki kendi kontrolüne
+# karşı okunur; iki t değeri ancak ondan sonra kıyaslanır.
+#   python run.py --config experiments/faz4_avcisiz_kontrol.yaml --load-genomes docs/faz2/population.npz
+run:
+  name: faz4_avcisiz_kontrol
+  steps: 12000
+agents:
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+rules:
+  predator:
+    enabled: false
+  share:
+    need_bonus: 3.0
+  attack:
+    enabled: true
+  kinship:
+    # Etiket tanımı gereği bilgisiz: gerçek kolda in/out farkı çıkıyorsa
+    # burada DÜZ kalmalı. Kalmıyorsa sinyal yapaydır.
+    control: shuffle_surnames
+viz:
+  color_by: lineage
+  every: 50

@@ -218,11 +218,17 @@ rules:
     # Adim basina TEK vurus + bekleme suresi => SEYRELTME (dilution):
     # N kisilik kumede vurulan olma olasiligin 1/N. "Avci gelince gruplas"
     # diye bir kural YOK; gruplasma karli hale gelir, secilim bulursa bulur.
-    # Kalibrasyon (Faz 3 rejiminde, 1500 adim): bu ayar olumlerin ~%23'unu
-    # avciya baglar ve koloni tavanda kalir. Daha zayifi secilim baskisi
-    # yaratmiyor (%1.6), daha gucluu koloniyi baskiliyor.
+    # Kalibrasyon TAM UFUKTA (12000 adim) yapilir. 1500 adimlik kalibrasyon
+    # yaniltti: 20 avci kisa vadede saglikli gorunup 12000 adimda karistirma
+    # kontrolunu tuketti (bkz. docs/faz4/adim1_avci.md).
+    #
+    # Onceden ilan edilmis olcut — en GUCLU baski, su ucunu birden saglayan:
+    #   (1) hem asil kol hem karistirma kontrolu 12000 adim yasar,
+    #   (2) son ceyrekte dis-grup firsat payi >= %10 (yoksa in/out orani gurultu),
+    #   (3) olumlerin >= %10'u avciya baglanir (yoksa secilim baskisi yok).
+    # seed 42'de: 8 avci -> dis pay %8.2 (2 kalir), 12 -> %22.8 ✓, 20 -> kontrol tukendi.
     enabled: true
-    count: 20
+    count: 12
     speed: 0.45           # ajanlardan hizli: bireysel kacis tek basina yetmesin
     vision: 25.0          # hedef arama menzili
     strike_radius: 2.0

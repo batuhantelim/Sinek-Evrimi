@@ -209,7 +209,9 @@ class Metrics:
             f"  toplam olum       : {sum(r['deaths'] for r in self.rows)} "
             f"(aclik {sum(r['death_starved'] for r in self.rows)}, "
             f"tehlike {sum(r['death_hazard'] for r in self.rows)}, "
-            f"yaslilik {sum(r['death_old_age'] for r in self.rows)})",
+            f"yaslilik {sum(r['death_old_age'] for r in self.rows)}, "
+            f"oldurulme {sum(r.get('death_killed', 0) for r in self.rows)}, "
+            f"avci {sum(r.get('death_predator', 0) for r in self.rows)})",
             f"  en uzun soy zinciri: {last['max_lineage']} nesil",
             f"  yemek doluluk     : baslangic {first['food_fill']:.3f}, son {last['food_fill']:.3f}",
             f"  kumelenme indeksi : {np.mean([r['clustering'] for r in self.rows]):.3f}",

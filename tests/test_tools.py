@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 from sinek.config import load_config  # noqa: E402
 
 import env_sweep  # noqa: E402
+import predator_sweep  # noqa: E402
 import seed_sweep  # noqa: E402
 
 # Taramanin bilerek farkli tuttugu, mekanigi etkilemeyen dallar.
@@ -159,6 +160,76 @@ class TestHostilityClassifier(unittest.TestCase):
         yoksa cokmekte olan koloniler yanlislikla 'D' etiketlenir."""
         kind, _ = self.case(pop_end=100.0)   # hedefli gorunuyor ama cokmus
         self.assertEqual(kind, "C")
+
+
+class TestPredatorArms(unittest.TestCase):
+    """Faz 4 taramasinin iddiasi: 'kollar arasindaki TEK fark avcidir'.
+    Rejim ile deney dosyalari ayrisirsa bu iddia coker."""
+
+    ARMS = {"avci": "faz4_avci.yaml", "avcisiz": "faz4_avcisiz.yaml"}
+
+    def _cfg(self, extra):
+        return load_config(overrides=seed_sweep.FIXED + seed_sweep.REGIME + extra).to_dict()
+
+    def test_arms_match_experiment_files(self):
+        for arm, fname in self.ARMS.items():
+            with self.subTest(arm=arm):
+                from_sweep = self._cfg(predator_sweep.ARMS[arm])
+                from_file = load_config(os.path.join(ROOT, "experiments", fname)).to_dict()
+                self.assertEqual(
+                    _mechanics(from_sweep),
+                    _mechanics(from_file),
+                    f"{arm} kolu ile {fname} ayrismis: 'tek fark avci' iddiasi gecersiz",
+                )
+
+    def test_arms_differ_only_in_the_predator_switch(self):
+        a = self._cfg(predator_sweep.ARMS["avci"])
+        b = self._cfg(predator_sweep.ARMS["avcisiz"])
+        self.assertNotEqual(a["rules"]["predator"], b["rules"]["predator"])
+        a["rules"]["predator"]["enabled"] = b["rules"]["predator"]["enabled"]
+        self.assertEqual(a, b, "kollar avci disinda bir sey de degistirmis")
+
+    def test_phase3_regime_keeps_the_predator_off(self):
+        """config.yaml varsayilani Faz 4'e ilerledi; Faz 3 taramasi sessizce
+        baska bir deneye donusmemeli."""
+        self.assertFalse(self._cfg([])["rules"]["predator"]["enabled"])
+
+
+class TestPredatorHostilityClassifier(unittest.TestCase):
+    """Eksen B disiplini avci altinda da gecerli: saldiri SEVIYESI ile YONU
+    ayri okunur, cokus hedeflilikten ONCE kontrol edilir."""
+
+    def case(self, **over):
+        pred = dict(
+            hostility=0.12, q_attack_in_group=0.05, q_attack_out_group=0.15,
+            attack_t=-6.0, population=600.0,
+        )
+        base = dict(hostility=0.0442, population=650.0)
+        pred.update({k: v for k, v in over.items() if k in pred})
+        base.update({k[5:]: v for k, v in over.items() if k.startswith("base_")})
+        return predator_sweep.classify(pred, base)
+
+    def test_healthy_and_targeted_is_hostility(self):
+        kind, why = self.case()
+        self.assertEqual(kind, "D")
+        self.assertIn("YABANCIYA", why)
+
+    def test_collapse_check_precedes_targeting(self):
+        kind, why = self.case(population=300.0)   # hedefli ama koloni erimis
+        self.assertEqual(kind, "C")
+        self.assertIn("cokus", why)
+
+    def test_blind_increase_is_not_hostility(self):
+        kind, _ = self.case(attack_t=-0.3)
+        self.assertEqual(kind, "C")
+
+    def test_level_and_direction_are_reported_separately(self):
+        """Saldiri artmadiysa D/C sorusu dusmez — ama YON yine de yazilir."""
+        kind, why = self.case(hostility=0.03, q_attack_in_group=0.01,
+                              q_attack_out_group=0.05, attack_t=-9.0)
+        self.assertEqual(kind, "artmadi")
+        self.assertIn("YON", why)
+        self.assertIn("5.00x", why)
 
 
 class TestSweepStatistics(unittest.TestCase):

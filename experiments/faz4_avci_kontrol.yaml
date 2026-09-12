@@ -1,0 +1,29 @@
+# FAZ 4 adım 1 KONTROL — avcı AÇIK + soyisim karıştırma.
+#
+# Avcılı kolun eşleşmiş kontrolü: rejim birebir aynı, tek fark soyisimlerin
+# her adım karıştırılması. Avcı altında çıkan her in/out farkı ÖNCE buna
+# karşı okunur — sıfıra karşı değil.
+#   python run.py --config experiments/faz4_avci_kontrol.yaml --load-genomes docs/faz2/population.npz
+run:
+  name: faz4_avci_kontrol
+  steps: 12000
+agents:
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+rules:
+  predator:
+    enabled: true
+  share:
+    need_bonus: 3.0
+  attack:
+    enabled: true
+  kinship:
+    # Etiket tanımı gereği bilgisiz: avcı altında in/out farkı çıkıyorsa
+    # burada DÜZ kalmalı. Kalmıyorsa sinyal yapaydır.
+    control: shuffle_surnames
+viz:
+  color_by: lineage
+  every: 50

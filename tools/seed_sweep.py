@@ -35,6 +35,9 @@ REGIME = [
     "agents.reproduction.spawn_radius=0.3",
     "rules.share.need_bonus=3.0",
     "rules.attack.enabled=true",
+    # Faz 4 avcisi bu rejimin parcasi DEGIL: config.yaml varsayilani ilerledi
+    # diye adim 2 taramasi sessizce baska bir deney olmasin.
+    "rules.predator.enabled=false",
 ]
 FIXED = ["viz.mode=none", "metrics.enabled=false"]
 SEED_POP = "docs/faz2/population.npz"

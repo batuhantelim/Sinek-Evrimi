@@ -1,0 +1,25 @@
+# FAZ 4 adım 1 AVCISIZ KOL — avcının etkisini okuyabilmek için taban çizgisi.
+#
+# Rejim, Faz 3 adım 2 ile BIREBIR aynı (r_azalan + need_bonus + attack) ve
+# avcı KAPALI. Yani bu kol, sensör sözleşmesi 19'a çıktıktan sonra adım 2'nin
+# yeniden koşulmuş hâlidir — "avcı şunu değiştirdi" ancak buna karşı okunur.
+#   python run.py --config experiments/faz4_avcisiz.yaml --load-genomes docs/faz2/population.npz
+run:
+  name: faz4_avcisiz
+  steps: 12000
+agents:
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+rules:
+  predator:
+    enabled: false
+  share:
+    need_bonus: 3.0
+  attack:
+    enabled: true
+viz:
+  color_by: lineage
+  every: 50

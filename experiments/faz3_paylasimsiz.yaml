@@ -5,5 +5,9 @@
 run:
   name: faz3_paylasimsiz
 rules:
+  attack:
+    enabled: false        # bu deney saldirisiz kurulmustu
+  predator:
+    enabled: false        # Faz 4 mekanigi; bu deney avcisiz kurulmustu
   share:
     enabled: false

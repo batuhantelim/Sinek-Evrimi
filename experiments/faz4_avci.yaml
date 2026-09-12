@@ -1,0 +1,30 @@
+# FAZ 4 adım 1 — DOĞAL AVCI: ortak, dışsal, gruptan bağımsız tehdit.
+#
+# Rejim, Faz 3 adım 2 ile BIREBIR aynı (r_azalan + need_bonus + attack).
+# Tek değişen avcının açık olması: negatifler (dış-grup düşmanlık yok,
+# kıtlık düşmanlık üretmiyor) bu deneyin TABAN ÇİZGİSİDİR, dolayısıyla
+# başka hiçbir şey oynatılmaz.
+#
+# Avcı SOYISME BAKMAZ (sinek/predator.py::_nearest). Belirli bir soyu
+# hedefleseydi grup düşmanlığını elle kurmuş olurduk.
+# "Avcı gelince gruplaş" ya da "yabancıya saldır" diye bir kural YOK.
+#   python run.py --config experiments/faz4_avci.yaml --load-genomes docs/faz2/population.npz
+run:
+  name: faz4_avci
+  steps: 12000
+agents:
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+rules:
+  predator:
+    enabled: true
+  share:
+    need_bonus: 3.0
+  attack:
+    enabled: true
+viz:
+  color_by: lineage
+  every: 50

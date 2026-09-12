@@ -5,5 +5,9 @@
 run:
   name: faz3_kontrol_dagit
 rules:
+  attack:
+    enabled: false        # bu deney saldirisiz kurulmustu
+  predator:
+    enabled: false        # Faz 4 mekanigi; bu deney avcisiz kurulmustu
   kinship:
     control: scatter_offspring
