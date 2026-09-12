@@ -370,6 +370,12 @@ class Simulation:
             "best_food_eaten": round(float(pool[int(order[0])].food_eaten), 3),
             "behavior_diversity": round(behavior_diversity(pool), 5),
             "weight_diversity": round(weight_diversity(pool), 5),
+            # Cevresel baglam: kitlik taramalarinda rejimin gercekten
+            # degistigini dogrulamak icin nesil satirinda da dursun.
+            "food_fill": round(
+                self.world.food_total / max(1e-9, self.world.food_capacity_total), 5
+            ),
+            "population": len(self.agents),
         }
         lin = lineage_stats(self.agents)
         row.update(lin)

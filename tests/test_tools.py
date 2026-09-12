@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 from sinek.config import load_config  # noqa: E402
 
+import env_sweep  # noqa: E402
 import seed_sweep  # noqa: E402
 
 # Taramanin bilerek farkli tuttugu, mekanigi etkilemeyen dallar.
@@ -51,6 +52,57 @@ class TestSeedSweepRegime(unittest.TestCase):
         self.assertEqual(ctrl["rules"]["kinship"]["control"], "shuffle_surnames")
         base["rules"]["kinship"]["control"] = "shuffle_surnames"
         self.assertEqual(base, ctrl, "kontrol kosumu rejimde baska bir sey de degistirmis")
+
+
+class TestEnvSweepStaysEnvironmental(unittest.TestCase):
+    """Cevresel taramanin iddiasi: 'yeni davranis mekanigi yok, sadece dunya
+    parametreleri degisiyor'. Bir kosula yanlislikla fitness ya da odeme
+    parametresi sizarsa bu iddia coker ve sonuc yorumlanamaz hale gelir."""
+
+    #: Kosullarin dokunmasina izin verilen tek dallar.
+    ALLOWED_PREFIXES = (
+        "world.food.",          # kaynak bollugu/kitligi
+        "agents.motors.",       # karisma (hiz, donus)
+        "agents.reproduction.spawn_radius",   # yavrunun ne kadar uzaga dogdugu
+        "rules.kinship.split_rate",           # soy sayisi
+    )
+    #: Hicbir kosulun dokunmamasi gerekenler — bunlar DAVRANIS odemeleridir.
+    FORBIDDEN_PREFIXES = (
+        "evolution.fitness",
+        "rules.share.",
+        "rules.attack.",
+        "rules.kinship.control",
+        "brain.",
+    )
+
+    def test_conditions_only_touch_world_parameters(self):
+        for name, overrides in env_sweep.CONDITIONS.items():
+            for item in overrides:
+                key = item.split("=", 1)[0]
+                self.assertFalse(
+                    key.startswith(self.FORBIDDEN_PREFIXES),
+                    f"{name}: '{key}' bir davranis/odeme parametresi — cevresel tarama "
+                    "bunu degistiremez",
+                )
+                self.assertTrue(
+                    key.startswith(self.ALLOWED_PREFIXES),
+                    f"{name}: '{key}' izinli cevresel dallarin disinda",
+                )
+
+    def test_base_regime_is_the_step2_regime(self):
+        self.assertEqual(env_sweep.REGIME, seed_sweep.REGIME)
+        self.assertEqual(env_sweep.FIXED, seed_sweep.FIXED)
+
+    def test_axis_levers_are_distinct(self):
+        """A1 mekansal yapiya, A2 soy bolunmesine dokunmamali; yoksa iki
+        eksen ayni seyi olcer ve ayristirma imkansizlasir."""
+        a1_keys = {i.split("=")[0] for name in env_sweep.A1 for i in env_sweep.A1[name]}
+        a2_keys = {i.split("=")[0] for name in env_sweep.A2 for i in env_sweep.A2[name]}
+        self.assertTrue(a1_keys <= {"rules.kinship.split_rate"}, a1_keys)
+        self.assertTrue(
+            a2_keys <= {"agents.motors.max_speed", "agents.reproduction.spawn_radius"}, a2_keys
+        )
+        self.assertEqual(a1_keys & a2_keys, set(), "iki alt-kaldirac ayni anahtari oynatiyor")
 
 
 class TestSweepStatistics(unittest.TestCase):

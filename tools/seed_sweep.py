@@ -42,8 +42,11 @@ SEED_POP = "docs/faz2/population.npz"
 CELLS = ["coop_in_group", "coop_out_group", "attack_in_group", "attack_out_group"]
 
 
-def run(seed: int, steps: int, control: bool, seed_pop: str | None) -> list[dict]:
-    ov = FIXED + REGIME + [f"seed={seed}"]
+def run(
+    seed: int, steps: int, control: bool, seed_pop: str | None, extra: list[str] | None = None
+) -> list[dict]:
+    """Tek kosum. `extra` cevresel tarama icin ek override'lar (bkz. env_sweep)."""
+    ov = FIXED + REGIME + list(extra or []) + [f"seed={seed}"]
     if control:
         ov.append("rules.kinship.control=shuffle_surnames")
     cfg = load_config(overrides=ov)
