@@ -1,0 +1,36 @@
+================================================================================================================
+KOSUL BASINA (her satir bir seed; her koşum kendi karistirma kontroluyle okundu)
+================================================================================================================
+  kosul              seed  yemek%   dis%  assort          N |  saldiri%    ic%   dis%   atk_t      karar      D/C
+  B_bol                42   45.5%  35.8%   0.454    700>700 |     1.98%  1.03%  3.05%  -13.27  yabanciya  artmadi
+
+  B_cok_kit            42   59.4%  50.9%   0.216    700>700 |     3.11%  4.18%  5.00%   -0.91        kor  artmadi
+
+  B_kit                42   35.7%  15.2%   0.768    700>700 |     3.37%  4.90%  3.27%   -0.32        kor  artmadi
+
+================================================================================================================
+KOSUL ORTALAMALARI (seedler arasi)
+================================================================================================================
+  kosul              n   dis%  assort  yemek% |  saldiri%  atk_t ort                     kararlar
+  B_bol              1  35.8%   0.454   45.5% |     1.98%     -13.27             {'yabanciya': 1}
+  B_kit              1  15.2%   0.768   35.7% |     3.37%      -0.32                   {'kor': 1}
+  B_cok_kit          1  50.9%   0.216   59.4% |     3.11%      -0.91                   {'kor': 1}
+
+================================================================================================================
+DUSMANLIK (D) mi CARESIZLIK (C) mi?
+================================================================================================================
+  B_bol             s42     artmadi  saldiri %2.0 — tabana yakin, ayrim sorusu dusmuyor
+  B_cok_kit         s42     artmadi  saldiri %3.1 — tabana yakin, ayrim sorusu dusmuyor
+  B_kit             s42     artmadi  saldiri %3.4 — tabana yakin, ayrim sorusu dusmuyor
+
+  D = saldiri yabanciya hedefli, koloni ayakta, in-grup saldiri artmamis
+  C = korlemesine saldiri ve/veya koloni cokuyor -> grup dusmanligi DEGIL
+
+================================================================================================================
+AYRISTIRMA — saldiri ayrimciligini hangisi suruyor?
+================================================================================================================
+  n = 3 kosum
+  korelasyon  dis-grup payi ~ saldiri_t : -0.129
+  korelasyon  assortment    ~ saldiri_t : +0.118
+  korelasyon  yemek doluluk ~ saldiri_t : +0.058
+  DOGRUSAL BAGIMLILIK dis-grup ~ assortment : -1.000  (|r|>0.9 ise ikisi ayrilamaz — kaldiraclar yetmemis)

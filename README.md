@@ -48,6 +48,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 3 — adım 2 | `attack` + dört hücreli in/out analizi | ✅ |
 | 3 — sağlamlık | 5 seed'de tekrar (yön sağlam, büyüklük oynak) | ✅ |
 | 3 — eksen A | Dış-grup bolluğu düşmanlığı tetiklemiyor | ✅ |
+| 3 — eksen B | Kıtlık da saldırıyı artırmıyor; H1 ve H2 reddedildi | ✅ |
 | 4 | Doğal avcı, melez soyisim, soy-arası ilişki matrisi | ⏳ |
 
 Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/)

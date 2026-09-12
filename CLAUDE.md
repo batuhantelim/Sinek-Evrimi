@@ -35,7 +35,7 @@ davranış oradan **türer**.
 | **Faz 3 — adım 2** | `attack` + dört hücreli in/out analizi | ✅ **tamam** |
 | **Faz 3 — sağlamlık** | 5 seed'de tekrar; yön sağlam, büyüklük oynak | ✅ **tamam** |
 | **Faz 3 — eksen A** | Dış-grup bolluğu düşmanlığı tetiklemiyor; adım 2 daraltıldı | ✅ **tamam** |
-| **Faz 3 — eksen B** | Kaynak kıtlığı × saldırganlık (kasıtlı yemek süpürmesi) | ⏳ sıradaki |
+| **Faz 3 — eksen B** | Kıtlık saldırıyı hiç artırmadı; H2 de reddedildi | ✅ **tamam** |
 | **Faz 4** | Doğal avcı, melez soyisim, soy-arası ilişki matrisi | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 3).
@@ -575,6 +575,28 @@ Tam tablo: **[docs/faz3/eksenA_disgrup_bollugu.md](docs/faz3/eksenA_disgrup_boll
   bağımlılık yüksek (dış-grup ~ soy +0.875). Söylenebilecek tek net şey
   H1'in reddi.
 
+### Faz 3 eksen B — kaynak kıtlığı (3 seviye × seed 42, her biri kontrolüyle)
+
+Tam tablo: **[docs/faz3/eksenB_kitlik.md](docs/faz3/eksenB_kitlik.md)**
+
+- **H2 reddedildi.** Kişi başı kaynak girdisinde **16 kat** aralık tarandı
+  (0.573 → 0.036); saldırı üç seviyede de taban rejimin (%4.42) *altında*
+  kaldı (%1.98 / %3.37 / %3.11). Koloni hiçbirinde çökmedi.
+  **D/Ç ayrımı gündeme bile gelmedi** — kıtlık saldırganlığı hiç hareket
+  ettirmiyor.
+- **`food_fill` koşullar arası geçersizmiş.** Bir orandır ve kapasite koşula
+  göre değişir: `B_cok_kit` yamaları 24→14 indirdiği için en kıt koşul en
+  **yüksek** doluluğu (%59.4) gösterdi. Doğru değişken **kişi başı kaynak
+  girdisi** (`yenilenme × kapasite / N`).
+- **Pooling A+B işe yaradı:** yemek ile assortment artık ayrık (r = +0.023),
+  yani tek eksende yapılamayan ayrıştırma mümkün oldu.
+- **Ama hiçbir çevresel skaler kararı öngörmüyor.** n=15'te kör (4) ve
+  yabancıya (11) sınıfları assortment'ta (0.216–0.768 vs 0.221–0.768) ve
+  dış-grup payında tamamen örtüşüyor. Dört değişkenli regresyon R² = 0.511
+  ama düzeltilmiş R² ≈ 0.32 ve `assortment ~ dış_pay` −0.822 bağımlı.
+- ⚠ **Ara raporda verdiğim "düşük assortment → yabancıya" örüntüsü yanlıştı.**
+  `B_cok_kit` assortment 0.216 (en düşük) ile **kör**. Örüntü yok.
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -661,6 +683,14 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
   dış-grup payını yükseltti (beklentinin tersi) ve kaldıraçlar yemek
   dengesini de oynattı. Tarama koşullarında niyetlenen değişkenin yanında
   yan etkileri de kaydedin (`kin_assortment`, `food_fill`, `opp_*`).
+- **ORANLARI koşullar arası kıyaslamayın.** `food_fill = mevcut/kapasite`
+  bir orandır; kapasiteyi değiştiren bir koşul (yama sayısı) onu
+  karşılaştırılamaz kılar — eksen B'de en kıt koşul en yüksek doluluğu
+  gösterdi. Kıtlık için **kişi başı** büyüklük kullanın
+  (`yenilenme × kapasite / N`).
+- **Ara sonucu örüntü diye sunmayın.** Eksen A'nın ilk 8 noktası temiz bir
+  assortment eşiği gösteriyordu; kalan 4 nokta ve eksen B onu tamamen
+  çürüttü. Örüntü iddiası ancak tüm koşullar bitince yazılır.
 - **Bir aracın rejimi bir deney dosyasını taklit ediyorsa test edin.**
   `test_seed_sweep_regime_matches_step2` ikisi ayrışırsa kırmızıya döner.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.
