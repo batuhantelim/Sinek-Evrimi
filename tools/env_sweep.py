@@ -70,6 +70,40 @@ CORNERS = {
 }
 CONDITIONS: dict[str, list[str]] = {**A1, **A2, **B, **CORNERS}
 
+# Taban rejimin (A1_taban) olculen saldiri orani. Bir kosulda saldirinin
+# "artmis" sayilmasi icin esik referansi. Veriden gelir, bkz.
+# docs/faz3/eksenA_taramasi.txt — sabit degil, yeniden olculebilir.
+BASELINE_HOSTILITY = 0.0442
+
+
+def classify_hostility(r: dict) -> tuple[str, str]:
+    """Saldirinin arttigi bir kosulda bu DUSMANLIK mi CARESIZLIK mi?
+
+    Bu ayrim yapilmadan "kitlik dusmanlik uretir" yazilamaz:
+
+      D (dusmanlik) : saldiri ozellikle YABANCIYA yonelik, koloni ayakta,
+                      in-grup saldiri artmamis. Parochial, ilginc.
+      C (caresizlik): saldiri korlemesine herkese, ve/veya koloni cokuyor.
+                      Siradan aclik davranisi, grup dusmanligi DEGIL.
+
+    Dondurulen: (etiket, gerekce)
+    """
+    hostility = r["hostility"]
+    atk_in, atk_out = r["q_attack_in_group"], r["q_attack_out_group"]
+    collapse = r["pop_end"] < 0.6 * max(r["pop_start"], 1.0)
+    targeted = r["attack_t"] <= -2.0 and atk_out > 1.2 * atk_in
+    blind = atk_in >= 0.8 * atk_out
+
+    if hostility < 1.5 * BASELINE_HOSTILITY:
+        return "artmadi", f"saldiri %{hostility * 100:.1f} — tabana yakin, ayrim sorusu dusmuyor"
+    if collapse:
+        return "C", f"populasyon {r['pop_start']:.0f} -> {r['pop_end']:.0f} (cokus)"
+    if targeted and not blind:
+        return "D", f"atk_t {r['attack_t']:+.1f}, dis/ic saldiri {atk_out / max(atk_in, 1e-9):.2f}x, koloni ayakta"
+    if blind:
+        return "C", f"in ve out birlikte yuksek (ic %{atk_in * 100:.1f} / dis %{atk_out * 100:.1f})"
+    return "belirsiz", f"atk_t {r['attack_t']:+.1f}, dis/ic {atk_out / max(atk_in, 1e-9):.2f}x"
+
 
 def evaluate(name: str, seed: int, steps: int, seed_pop: str | None) -> dict:
     extra = CONDITIONS[name]
@@ -99,6 +133,9 @@ def evaluate(name: str, seed: int, steps: int, seed_pop: str | None) -> dict:
         "food_fill": float(series(main, "food_fill").mean()),
         "lineage_eff": float(series(main, "lineage_effective").mean()),
         "population": float(series(main, "population").mean()),
+        # Koloni sagligi: cokus, "caresizlik" etiketinin ana isareti.
+        "pop_start": float(main[0]["population"]),
+        "pop_end": float(main[-1]["population"]),
         # --- sonuclar ---
         "share_t": share_t,
         "attack_t": attack_t,
@@ -112,23 +149,26 @@ def evaluate(name: str, seed: int, steps: int, seed_pop: str | None) -> dict:
     out["attack_verdict"] = (
         "kor" if abs(attack_t) < 2.0 else ("akrabaya" if attack_t > 0 else "yabanciya")
     )
+    out["hostility_kind"], out["hostility_reason"] = classify_hostility(out)
     return out
 
 
 HEADER = (
-    f"  {'kosul':17s} {'seed':>5} {'dis%':>6} {'assort':>7} {'yemek%':>7} {'soy':>5} {'N':>5} "
-    f"| {'saldiri%':>9} {'atk_t':>7} {'karar':>10} | {'paylas%':>8} {'share_t':>8}"
+    f"  {'kosul':17s} {'seed':>5} {'yemek%':>7} {'dis%':>6} {'assort':>7} {'N':>10} "
+    f"| {'saldiri%':>9} {'ic%':>6} {'dis%':>6} {'atk_t':>7} {'karar':>10} {'D/C':>8}"
 )
 
 
 def fmt(r: dict) -> str:
     if r.get("extinct"):
         return f"  {r['condition']:17s} {r['seed']:>5}  (koloni tukendi)"
+    pop = f"{r.get('pop_start', 0):.0f}>{r.get('pop_end', 0):.0f}"
     return (
-        f"  {r['condition']:17s} {r['seed']:>5} {r['outgroup_share'] * 100:5.1f}% "
-        f"{r['assortment']:7.3f} {r['food_fill'] * 100:6.1f}% {r['lineage_eff']:5.1f} "
-        f"{r['population']:5.0f} | {r['hostility'] * 100:8.2f}% {r['attack_t']:+7.2f} "
-        f"{r['attack_verdict']:>10} | {r['cooperation'] * 100:7.2f}% {r['share_t']:+8.2f}"
+        f"  {r['condition']:17s} {r['seed']:>5} {r['food_fill'] * 100:6.1f}% "
+        f"{r['outgroup_share'] * 100:5.1f}% {r['assortment']:7.3f} {pop:>10} "
+        f"| {r['hostility'] * 100:8.2f}% {r['q_attack_in_group'] * 100:5.2f}% "
+        f"{r['q_attack_out_group'] * 100:5.2f}% {r['attack_t']:+7.2f} "
+        f"{r['attack_verdict']:>10} {r.get('hostility_kind', '?'):>8}"
     )
 
 
@@ -173,6 +213,23 @@ def summarize(path: str) -> None:
             f"| {np.mean([r['hostility'] for r in g]) * 100:8.2f}% "
             f"{np.mean([r['attack_t'] for r in g]):+10.2f} {str(v):>28}"
         )
+
+    # --- D / C ayrimi ---
+    if any("hostility_kind" in r for r in rows):
+        print()
+        print("=" * 112)
+        print("DUSMANLIK (D) mi CARESIZLIK (C) mi?")
+        print("=" * 112)
+        for r in rows:
+            if "hostility_kind" not in r:
+                continue
+            print(
+                f"  {r['condition']:17s} s{r['seed']:<5} {r['hostility_kind']:>8}  "
+                f"{r['hostility_reason']}"
+            )
+        print()
+        print("  D = saldiri yabanciya hedefli, koloni ayakta, in-grup saldiri artmamis")
+        print("  C = korlemesine saldiri ve/veya koloni cokuyor -> grup dusmanligi DEGIL")
 
     # --- iki eksen ayrilabildi mi? ---
     print()

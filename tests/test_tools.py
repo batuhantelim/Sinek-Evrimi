@@ -105,6 +105,47 @@ class TestEnvSweepStaysEnvironmental(unittest.TestCase):
         self.assertEqual(a1_keys & a2_keys, set(), "iki alt-kaldirac ayni anahtari oynatiyor")
 
 
+class TestHostilityClassifier(unittest.TestCase):
+    """D (dusmanlik) / C (caresizlik) ayrimi.
+
+    Bu ayrim yapilmadan "kitlik dusmanlik uretir" YAZILAMAZ: kitlikta artan
+    saldiri, korlemesine bir aclik davranisi da olabilir. Siniflandirici
+    yaniltici bir 'D' vermemeli.
+    """
+
+    def case(self, **kw):
+        base = dict(
+            hostility=0.10, q_attack_in_group=0.02, q_attack_out_group=0.06,
+            attack_t=-8.0, pop_start=700.0, pop_end=690.0,
+        )
+        base.update(kw)
+        return env_sweep.classify_hostility(base)
+
+    def test_targeted_hostility_with_healthy_colony_is_D(self):
+        kind, _why = self.case()
+        self.assertEqual(kind, "D")
+
+    def test_blind_attack_on_everyone_is_not_hostility(self):
+        kind, _why = self.case(q_attack_in_group=0.28, q_attack_out_group=0.30, hostility=0.30)
+        self.assertEqual(kind, "C", "in ve out birlikte yuksekken 'dusmanlik' denemez")
+
+    def test_colony_collapse_is_desperation_even_if_targeted(self):
+        """Cokusteki bir kolonide hedefli gorunen saldiri caresizliktir."""
+        kind, why = self.case(pop_end=258.0, hostility=0.77, q_attack_out_group=0.80)
+        self.assertEqual(kind, "C")
+        self.assertIn("cokus", why)
+
+    def test_no_elevation_means_question_does_not_arise(self):
+        kind, _why = self.case(hostility=0.045, attack_t=+0.9)
+        self.assertEqual(kind, "artmadi")
+
+    def test_collapse_check_precedes_targeting(self):
+        """Sira onemli: cokus kontrolu hedeflilik kontrolunden ONCE gelmeli,
+        yoksa cokmekte olan koloniler yanlislikla 'D' etiketlenir."""
+        kind, _ = self.case(pop_end=100.0)   # hedefli gorunuyor ama cokmus
+        self.assertEqual(kind, "C")
+
+
 class TestSweepStatistics(unittest.TestCase):
     def test_welch_t_sign_and_zero(self):
         a = np.array([5.0, 5.1, 4.9, 5.0])
