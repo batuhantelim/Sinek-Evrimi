@@ -68,6 +68,8 @@ BASE_COLUMNS = [
     "predator_strikes",
     "predator_kills",
     "predation_risk",     # oldurme / ajan  (kisi basi avlanma baskisi)
+    "repro_blocked",      # tavan yuzunden yanan ureme hakki (Faz 4.5)
+    "at_cap",             # populasyon max_count'a degdi mi (0/1)
 ]
 
 
@@ -167,6 +169,8 @@ class Metrics:
             "predator_strikes": sim.stats_step.get("predator_strikes", 0),
             "predator_kills": sim.stats_step.get("predator_kills", 0),
             "predation_risk": _r(sim.stats_step.get("predator_kills", 0) / max(1, n), 6),
+            "repro_blocked": sim.stats_step.get("repro_blocked", 0),
+            "at_cap": int(n >= int(sim.cfg.agents.max_count)),
         }
         lin = lineage_stats(agents)
         row.update(lin)
@@ -215,6 +219,8 @@ class Metrics:
             f"  en uzun soy zinciri: {last['max_lineage']} nesil",
             f"  yemek doluluk     : baslangic {first['food_fill']:.3f}, son {last['food_fill']:.3f}",
             f"  kumelenme indeksi : {np.mean([r['clustering'] for r in self.rows]):.3f}",
+            f"  TAVAN BASKISI     : adimlarin %{np.mean([r.get('at_cap', 0) for r in self.rows]) * 100:.1f}'i "
+            f"tavanda, yanan ureme hakki {sum(r.get('repro_blocked', 0) for r in self.rows)}",
             f"  davranis cesitliligi: {last['behavior_diversity']:.5f}"
             f"   {'(klonlar)' if last['behavior_diversity'] == 0 else ''}",
             f"  agirlik cesitliligi : {last.get('weight_diversity', 0.0):.5f}",

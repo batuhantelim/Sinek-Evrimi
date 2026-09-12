@@ -283,8 +283,17 @@ class Simulation:
         cap = int(cfg.agents.max_count)
 
         newborns: list[Agent] = []
-        for a in self.agents:
+        for i, a in enumerate(self.agents):
             if len(self.agents) + len(newborns) >= cap:
+                # TAVAN BASKISI. `agents.max_count` bir "bellek/hiz emniyeti"
+                # olarak konmustu; bagladiginda ureme bir SLOT KUYRUGUNA doner
+                # ve enerji fitness'a donusmez. Kac ureme hakkinin tavan
+                # yuzunden yandigini SAYIYORUZ: bu sayac 0'a yakin degilse
+                # populasyonu cevre degil sabit sinirliyordur.
+                self.stats_step["repro_blocked"] += sum(
+                    1 for b in self.agents[i:]
+                    if b.energy >= threshold and b.age >= min_age
+                )
                 break
             if a.energy < threshold or a.age < min_age:
                 continue
@@ -405,8 +414,9 @@ class Simulation:
         acc = self._epoch_acc if self.mode != "generational" else self.stats_total
         row.update(social_rates(acc))
         # Faz 4 avlanma muhasebesi + koloni sagligi (D/C ayrimi bunlara bakar).
-        for key in ("deaths", "births", "death_starved", "death_predator",
-                    "predator_strikes", "predator_kills"):
+        for key in ("deaths", "births", "death_starved", "death_old_age",
+                    "death_predator", "predator_strikes", "predator_kills",
+                    "repro_blocked"):
             row[key] = int(acc.get(key, 0))
         # KISI BASI hizlar. `food_fill` bir ORANDIR ve kapasiteye bagimlidir;
         # kosullar arasi kiyaslanamaz (eksen B dersi). Bunlar ajan-adim basina
@@ -654,6 +664,7 @@ def _empty_stats() -> dict:
     return {
         "births": 0,
         "deaths": 0,
+        "repro_blocked": 0,   # tavan yuzunden yanan ureme hakki (Faz 4.5)
         "death_starved": 0,
         "death_hazard": 0,
         "death_old_age": 0,
