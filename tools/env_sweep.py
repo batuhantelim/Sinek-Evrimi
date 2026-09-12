@@ -91,6 +91,10 @@ def evaluate(name: str, seed: int, steps: int, seed_pop: str | None) -> dict:
         "extinct": False,
         # --- eksen degiskenleri: kaldiracin ne yaptigini OLCUYORUZ ---
         "outgroup_share": on / (ok + on) if (ok + on) > 0 else 0.0,
+        # Mutlak firsat sayilari: dis-grup orani kucukse oranin gurultu olup
+        # olmadigini ancak bunlara bakarak degerlendirebiliriz.
+        "opp_kin": ok,
+        "opp_nonkin": on,
         "assortment": float(series(main, "kin_assortment").mean()),
         "food_fill": float(series(main, "food_fill").mean()),
         "lineage_eff": float(series(main, "lineage_effective").mean()),
