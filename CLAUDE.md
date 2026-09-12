@@ -33,6 +33,7 @@ davranış oradan **türer**.
 | **Faz 3 — adım 1** | Soyisim + akrabalık sensörü + paylaşma + kontrol grupları | ✅ **tamam** |
 | **Faz 3 — adım 1.5** | Hamilton kuralı `r·b/c` taraması; yapısal engelin bulunması | ✅ **tamam** |
 | **Faz 3 — adım 2** | `attack` + dört hücreli in/out analizi | ✅ **tamam** |
+| **Faz 3 — sağlamlık** | 5 seed'de tekrar; yön sağlam, büyüklük oynak | ✅ **tamam** |
 | **Faz 4** | Doğal avcı, melez soyisim, soy-arası ilişki matrisi | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 3).
@@ -71,6 +72,7 @@ tools/benchmark_genomes.py  Evrimleşmiş koloni vs acemi koloni, aynı dünyada
 tools/kin_probe.py      Akrabalık sensörü sondası: beyin akrabalığı okuyor mu?
 tools/sweep_hamilton.py Hamilton kuralı rejim taraması (her rejim + kontrolü)
 tools/parochial_report.py  Dört hücreli in/out matrisi + birlikte hareket
+tools/seed_sweep.py     Adım 2'yi çok seed'de tekrarlar (tekrarlanabilirlik tablosu)
 tests/                  unittest — determinizm + Faz 1 + Faz 2 testleri
 ```
 
@@ -534,6 +536,25 @@ Dört hücreli matris (son çeyrek, fırsata koşullu):
   Misilleme/hafıza/itibar ve **gruplar arası rekabet** yok; literatürde
   parochial düşmanlık genelde o baskı altında çıkar.
 
+### Faz 3 sağlamlık taraması (5 seed, aynı rejim, her biri kontrolüyle)
+
+Tam tablo: **[docs/faz3/adim2_seed_taramasi.md](docs/faz3/adim2_seed_taramasi.md)**
+
+- **In-grup fedakârlık 5/5 seed'de kontrolden ayrıştı.** `kin_bias_adj`
+  asıl +28.02 ± 10.05 puan, kontrol +0.39 ± 0.15; Welch t +10.75 ± 5.33,
+  en zayıfı +5.43. Yön sağlam.
+- **Dış-grup düşmanlık 4/5 seed'de akrabalığa kör** — adım 2 sonucu tekrarlandı.
+- **Büyüklük oynak**: `kin_bias_adj` 11.4–36.1 puan, in-grup paylaşım oranı
+  %17.5–%91.3. Tek seed'in mutlak seviyesini "koloninin işbirliği düzeyi"
+  diye okumayın; **oran ve yön** raporlanır, mutlak seviye değil.
+- seed 42 adım 2'yi birebir tekrarladı — determinizm ve rejim eşleşmesi
+  ayrıca doğrulandı (`test_seed_sweep_regime_matches_step2` bunu koruyor).
+- **İpucu (kanıt değil):** tek istisna seed 2024, aynı zamanda en düşük
+  assortment'a (0.23) ve en yüksek dış-grup fırsat payına (%53) sahip.
+  5 nokta üzerinde korelasyon 0.900, ama 2024 çıkarılınca −0.087 — yani
+  korelasyon tek noktaya dayanıyor. Sınamak için dış-grup fırsat payını
+  doğrudan süpüren bir tarama gerekir.
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -607,6 +628,11 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
 - **Testler kendi fazlarını sabitler.** `tests/test_phase1.py` refleks + mutasyon
   kapalı override'ları ile başlar; `config.yaml` varsayılanı ilerlese de Faz 1
   testleri Faz 1'i ölçmeye devam eder.
-- **Faz sınırına saygı.** Faz 3 kancası bilerek `NotImplementedError` atıyor;
-  sessizce yok saymak yerine yüksek sesle patlaması tercih edildi.
+- **Faz sınırına saygı.** Bilinmeyen bir kural değeri varsayılana düşmez,
+  `ValueError` atar; sessizce yok saymak yerine yüksek sesle patlamak tercih edildi.
+- **Tek seed sonuç değildir.** Bir bulguyu rapor etmeden önce
+  `tools/seed_sweep.py` ile birkaç seed'de tekrarlayın: Faz 3'te yön 5/5
+  tuttu ama büyüklükler 3–5× aralıkta oynadı.
+- **Bir aracın rejimi bir deney dosyasını taklit ediyorsa test edin.**
+  `test_seed_sweep_regime_matches_step2` ikisi ayrışırsa kırmızıya döner.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.

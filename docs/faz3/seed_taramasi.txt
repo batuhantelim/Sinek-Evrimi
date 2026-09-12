@@ -1,0 +1,22 @@
+======================================================================================================================
+TEKRARLANABILIRLIK TABLOSU — 5 seed, her biri kontroluyle birlikte
+  (dort hucre: son ceyrek, firsata kosullu; kin_adj: son yari ortalamasi, yuzde puan)
+======================================================================================================================
+    seed  paylas ic  paylas dis  saldir ic  saldir dis |  kin_adj  kontrol      t  ayristi |  atk_t   saldiri |     r   soy
+       7     44.50%      26.58%      5.06%       5.52% |   +26.16    +0.43  +6.77     EVET |  -0.39       kor |  0.61   7.1
+      42     56.11%      21.51%      5.10%       3.84% |   +35.07    +0.60 +18.55     EVET |  +0.92       kor |  0.77   4.5
+     123     91.30%      74.37%      1.05%       0.93% |   +31.38    +0.19  +5.43     EVET |  -1.80       kor |  0.82   3.5
+     999     90.25%      63.53%      3.53%       3.31% |   +36.06    +0.44  +9.55     EVET |  -1.32       kor |  0.66   4.1
+    2024     17.52%       3.52%      2.09%       3.71% |   +11.43    +0.30 +13.42     EVET | -10.23 yabanciya |  0.23  10.6
+
+======================================================================================================================
+OZET
+======================================================================================================================
+  in-grup fedakarlik kontrolden ayristi : 5/5 seed
+     kin_bias_adj asil   : +28.02 +- 10.05 puan
+     kin_bias_adj kontrol: +0.39 +- 0.15 puan
+     Welch t             : +10.75 +- 5.33  (min +5.43)
+     in/dis orani        : 2.38x +- 1.55
+  dis-grup saldiri akrabaliga KOR kaldi : 4/5 seed
+     saldiri kararlari   : {'kor': 4, 'yabanciya': 1}
+  ornek/baglam: opp_kin 191505, opp_dis 52455 (dis-grup payi 23.8%), r 0.62, etkin soy 6.0
