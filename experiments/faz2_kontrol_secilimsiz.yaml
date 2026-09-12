@@ -19,6 +19,8 @@ evolution:
     energy: 0.0
     distance: 0.0
 rules:
+  attack:
+    enabled: false        # bu deney saldirisiz kurulmustu
   share:
     enabled: false
 viz:

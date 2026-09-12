@@ -1,0 +1,43 @@
+==============================================================================
+DORT HUCRELI MATRIS — son ceyrek ortalamasi (firsata kosullu, %)
+==============================================================================
+  hucre                       faz3b_saldiri      faz3b_kontrol
+  PAYLAS  in-grup                   56.111%             4.854%
+  PAYLAS  dis-grup                  21.511%             4.470%
+  SALDIR  in-grup                    5.096%             4.089%
+  SALDIR  dis-grup                   3.844%             4.179%
+
+  Parochial imza beklentisi: in-grupta PAYLAS yuksek + SALDIR dusuk,
+  dis-grupta tam tersi. Kontrolde dort hucre de birbirine yakin olmali.
+
+==============================================================================
+CEYREKLER BOYUNCA EGILIM (4 ceyrek, % ve donem basina egim)
+==============================================================================
+  -- faz3b_saldiri (24 donem) --
+     PAYLAS  in-grup        42.493 -> 69.093 -> 64.556 -> 56.111   egim +0.5790/donem  yukseliyor
+     PAYLAS  dis-grup       17.714 -> 11.887 -> 23.014 -> 21.511   egim +0.3418/donem  yukseliyor
+     SALDIR  in-grup         0.735 ->  2.149 ->  4.127 ->  5.096   egim +0.2484/donem  yukseliyor
+     SALDIR  dis-grup        1.198 ->  3.688 ->  4.884 ->  3.844   egim +0.1487/donem  yukseliyor
+  -- faz3b_kontrol (24 donem) --
+     PAYLAS  in-grup        18.009 ->  7.199 ->  5.857 ->  4.854   egim -0.7241/donem  dusuyor
+     PAYLAS  dis-grup       18.391 ->  6.533 ->  5.046 ->  4.470   egim -0.7638/donem  dusuyor
+     SALDIR  in-grup         1.486 ->  3.670 ->  3.511 ->  4.089   egim +0.1300/donem  yukseliyor
+     SALDIR  dis-grup        1.403 ->  3.618 ->  3.468 ->  4.179   egim +0.1388/donem  yukseliyor
+
+==============================================================================
+BIRLIKTE HAREKET — in-grup fedakarlik vs dis-grup dusmanlik
+==============================================================================
+  kosum                      r(ic-paylas, dis-saldir)   r(duzeltilmis)
+  faz3b_saldiri                                 0.682            0.487
+  faz3b_kontrol                                -0.902            0.126
+
+  Birinci sutun: iki ham egri birlikte mi hareket ediyor.
+  Ikinci sutun: konfound duzeltilmis ayrimcilik olculeri — paylasimda
+  akraba kayirma ile saldirida akraba ESIRGEME birlikte mi gidiyor.
+  ASIL KANIT bu ikincisidir; birincisi ortak trendlerden sisebilir.
+
+==============================================================================
+ORNEKLEM VE BAGLAM (son ceyrek)
+==============================================================================
+  faz3b_saldiri            opp_kin   225125  opp_dis    41822  r(assort) 0.751  soy   4.7  oldurme     174
+  faz3b_kontrol            opp_kin    12297  opp_dis   170361  r(assort) -0.002  soy  25.3  oldurme     294

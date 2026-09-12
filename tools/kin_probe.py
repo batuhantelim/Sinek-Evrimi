@@ -44,7 +44,8 @@ def probe(genomes, cfg, samples: int = 200, seed: int = 0) -> dict:
     # Komsu HER IKI kosulda da var: tek degisen akrabalik olsun.
     base[:, S["near_agent"]] = 1.0
 
-    diffs = []
+    motors = [m for m in ("share", "attack") if m in M]
+    diffs: dict[str, list[float]] = {m: [] for m in motors}
     for genome in genomes:
         brain = make_brain(cfg, genome)
         outs = {}
@@ -57,19 +58,21 @@ def probe(genomes, cfg, samples: int = 200, seed: int = 0) -> dict:
                 out = None
                 for _ in range(SETTLE):  # ayni girdiyi tekrarlayip durumu oturt
                     out = brain.act(s, rng)
-                vals.append(float(out[M["share"]]))
+                vals.append([float(out[M[m]]) for m in motors])
             outs[kin_value] = np.array(vals)
-        diffs.append(float((outs[1.0] - outs[-1.0]).mean()))
+        delta = (outs[1.0] - outs[-1.0]).mean(axis=0)
+        for i, m in enumerate(motors):
+            diffs[m].append(float(delta[i]))
 
-    d = np.array(diffs)
-    return {
-        "n": len(d),
-        "mean": float(d.mean()),
-        "median": float(np.median(d)),
-        "std": float(d.std()),
-        "pos_frac": float((d > 0).mean()),
-        "abs_mean": float(np.abs(d).mean()),
-    }
+    result = {"n": len(genomes)}
+    for m in motors:
+        d = np.array(diffs[m])
+        result[m] = {
+            "mean": float(d.mean()),
+            "median": float(np.median(d)),
+            "pos_frac": float((d > 0).mean()),
+        }
+    return result
 
 
 def main(argv=None) -> int:
@@ -82,18 +85,25 @@ def main(argv=None) -> int:
 
     cfg = load_config(overrides=args.overrides)
     print("Sonda: ayni sensor vektoru, yalnizca akrabalik kanali degisiyor.")
-    print(f"       paylasim motoru farki = ortalama(share | akraba) - ortalama(share | yabanci)")
+    print("       fark = ortalama(motor | akraba) - ortalama(motor | yabanci)")
     print(f"       {args.samples} sensor ornegi x genom basina\n")
-    print(f"  {'kayit':34s} {'genom':>6} {'fark':>9} {'medyan':>9} {'akrabayi kayiran':>17}")
+    print(
+        f"  {'kayit':30s} {'genom':>6} | {'PAYLAS fark':>12} {'kayiran':>8} "
+        f"| {'SALDIR fark':>12} {'kayiran':>8}"
+    )
     for path in args.populations:
         genomes, _meta = load_population(path, cfg)
         r = probe(genomes, cfg, args.samples, args.seed)
         label = os.path.basename(os.path.dirname(path)) or path
-        print(
-            f"  {label:34s} {r['n']:6d} {r['mean']:+9.4f} {r['median']:+9.4f} "
-            f"{r['pos_frac'] * 100:16.1f}%"
-        )
-    print("\n  fark ~0 ve kayirma ~%50 ise beyin akrabalik kanalini OKUMUYOR demektir.")
+        sh = r.get("share", {"mean": 0.0, "pos_frac": 0.0})
+        at = r.get("attack")
+        line = f"  {label:30s} {r['n']:6d} | {sh['mean']:+12.4f} {sh['pos_frac'] * 100:7.1f}%"
+        if at:
+            line += f" | {at['mean']:+12.4f} {at['pos_frac'] * 100:7.1f}%"
+        print(line)
+    print("\n  fark ~0 ve kayiran ~%50 ise beyin akrabalik kanalini OKUMUYOR demektir.")
+    print("  Parochial imza: PAYLAS farki POZITIF (akrabaya cok) ve")
+    print("                  SALDIR farki NEGATIF (akrabaya az) olmali.")
     return 0
 
 

@@ -45,6 +45,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 1 | Klon ajan + ortam + hareket + yemek + üreme/ölüm | ✅ |
 | 2 | Mutasyon + seçilim + evrimleşebilir recurrent sinir ağı | ✅ |
 | 3 — adım 1 | Soyisim + akrabalık sensörü + paylaşma + kontrol grupları | ✅ |
-| 3 — adım 2 | `attack`, tam in/out-group düşmanlık analizi | ⏳ |
+| 3 — adım 2 | `attack` + dört hücreli in/out analizi | ✅ |
+| 4 | Doğal avcı, melez soyisim, soy-arası ilişki matrisi | ⏳ |
 
 Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/)

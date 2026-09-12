@@ -49,7 +49,10 @@ MOTOR_NAMES: list[str] = [
     "thrust",   #  0..1  ileri hiz    (x max_speed hucre)
     "eat",      #  0..1  yeme istegi
     "share",    #  0..1  Faz 3: en yakin ajana enerji aktarma istegi
-    # Faz 3 adim 2'de "attack" buraya, SONA eklenecek.
+    "attack",   #  0..1  Faz 3 adim 2: en yakin ajandan enerji alma istegi
+    # Ikisi de ayni komsuyu hedefler ve birbirini disliyor: hangisi esigini
+    # daha cok asiyorsa o gerceklesir. Boylece "verecek miyim / alacak miyim"
+    # tek bir karar olarak evrimlesir.
 ]
 N_MOTORS = len(MOTOR_NAMES)
 
@@ -84,6 +87,10 @@ class Agent:
     given: float = 0.0        # baskalarina aktarilan enerji
     received: float = 0.0     # baskalarindan alinan enerji
     shares_made: int = 0
+    attacks_made: int = 0     # yapilan saldiri
+    damage_dealt: float = 0.0 # hedeflere verilen toplam zarar
+    stolen: float = 0.0       # saldiriyla elde edilen enerji
+    damage_taken: float = 0.0 # ustune gelen zarar
     nearest: "Agent | None" = None   # o adimdaki en yakin komsu (adim basi onbellek)
     last_motors: np.ndarray = field(
         default_factory=lambda: np.zeros(N_MOTORS, dtype=np.float32)

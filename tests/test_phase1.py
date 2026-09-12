@@ -149,14 +149,14 @@ class TestPhase1(unittest.TestCase):
         dx, dy = w.delta(1.0, 1.0, w.width - 1.0, 1.0)
         self.assertAlmostEqual(dx, -2.0)
 
-    def test_unimplemented_rules_fail_loudly(self):
-        """Henuz yazilmamis kural acilirsa sessizce yok sayilmamali, patlamali.
+    def test_unknown_rule_value_fails_loudly(self):
+        """Tanimsiz bir kural degeri sessizce yok sayilmamali, patlamali.
 
-        (share Faz 3'te uygulandi; sinir artik attack'te.)
+        (share ve attack artik uygulandi; disiplin ayni: bilinmeyen ayar
+        varsayilana dusmek yerine hata verir.)
         """
-        sim = make(rules__attack__enabled=True)
-        with self.assertRaises(NotImplementedError):
-            sim.step()
+        with self.assertRaises(ValueError):
+            make(rules__kinship__control="boyle_bir_kontrol_yok")
 
 
 class TestRendering(unittest.TestCase):

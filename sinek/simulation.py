@@ -47,7 +47,12 @@ from .metrics import (
 from .spatial import SpatialHash
 from .world import World
 
-DEATH_KEYS = {"starved": "death_starved", "hazard": "death_hazard", "old_age": "death_old_age"}
+DEATH_KEYS = {
+    "starved": "death_starved",
+    "hazard": "death_hazard",
+    "old_age": "death_old_age",
+    "killed": "death_killed",
+}
 
 #: Paylasim istatistiklerinin ayrildigi verici-enerjisi katmani sayisi.
 ENERGY_BUCKETS = 5
@@ -124,7 +129,8 @@ class Simulation:
         self.graveyard: list[Agent] = []  # bu neslin oluleri (secilim havuzunda kalirlar)
         self.generation_rows: list[dict] = []
         self._epoch_acc: dict = {}
-        self.share_events: list[tuple] = []  # gorsellestirme icin (x1,y1,x2,y2,kin)
+        self.share_events: list[tuple] = []   # gorsellestirme icin (x1,y1,x2,y2,kin)
+        self.attack_events: list[tuple] = []
         self.stats_step = _empty_stats()
         self.stats_total = _empty_stats()
         self.extinct_at: int | None = None
@@ -208,7 +214,7 @@ class Simulation:
         survivors = []
         for a in self.agents:
             if a.energy <= 0.0:
-                cause = a.death_cause if a.death_cause == "hazard" else "starved"
+                cause = a.death_cause if a.death_cause in ("hazard", "killed") else "starved"
                 self._kill(a, cause)
             elif a.age >= a.lifespan:
                 self._kill(a, "old_age")
@@ -400,16 +406,19 @@ class Simulation:
         Transferler id sirasinda ve ardisik uygulanir (simulasyonun geri
         kalaniyla ayni konvansiyon) — deterministik.
         """
-        if self._attack_on:
-            raise NotImplementedError(
-                "rules.attack Faz 3 adim 2'de uygulanacak (once share onaylanmali)."
-            )
         self.share_events.clear()
-        if not self._share_on:
+        self.attack_events.clear()
+        if not self._social_enabled:
             return
 
         cfg = self.cfg
         sh = cfg.rules.share
+        at = cfg.rules.attack
+        atk_threshold = float(at.threshold)
+        atk_damage = float(at.damage)
+        atk_steal = float(at.steal_ratio)
+        atk_cost = float(at.cost)
+        atk_floor = float(at.min_attacker_energy)
         threshold = float(sh.threshold)
         amount_max = float(sh.amount)
         overhead = float(sh.overhead)
@@ -439,9 +448,19 @@ class Simulation:
             bucket = min(ENERGY_BUCKETS - 1, int(a.energy / e_max * ENERGY_BUCKETS))
             stats[f"{'opp_kin' if kin else 'opp_non'}_{bucket}"] += 1
 
-            urge = float(a.last_motors[M["share"]])
-            if urge < threshold:
+            share_urge = float(a.last_motors[M["share"]]) if self._share_on else 0.0
+            atk_urge = float(a.last_motors[M["attack"]]) if self._attack_on else 0.0
+            # Iki eylem birbirini disliyor: esigini daha cok asan kazanir.
+            share_margin = share_urge - threshold
+            atk_margin = atk_urge - atk_threshold
+            if atk_margin > share_margin and atk_margin >= 0.0:
+                self._do_attack(
+                    a, other, kin, bucket, atk_urge, atk_damage, atk_steal, atk_cost, atk_floor
+                )
                 continue
+            if share_margin < 0.0:
+                continue
+            urge = share_urge
 
             # Verenin net maliyeti: aktarilan + islem. Kendini oldurecek
             # kadarini veremez; taban enerjinin altina inmez.
@@ -488,6 +507,40 @@ class Simulation:
             stats["share_kin" if kin else "share_nonkin"] += 1
             stats[f"{'shr_kin' if kin else 'shr_non'}_{bucket}"] += 1
             self.share_events.append((a.x, a.y, other.x, other.y, kin))
+
+    def _do_attack(self, a, other, kin, bucket, urge, damage, steal, cost, floor) -> None:
+        """Saldiri: hedeften enerji alir, hedefe zarar verir, saldirgana MALIYET.
+
+        SALDIRI DA ODULLENDIRILMEZ. `evolution.fitness` icinde saldiri terimi
+        yoktur; `attacks_made`/`damage_dealt` yalnizca olcum icindir.
+
+        Maliyet sabit, kazanc ise hedefin enerjisiyle SINIRLI: fakir bir hedefe
+        saldirmak net ZARARDIR. Boylece "herkes herkese saldirir" dejenere
+        cozumu olusmaz, ayrimcilik icin gercek bir secilim baskisi kalir.
+        """
+        stats = self.stats_step
+        if a.energy - cost <= floor:
+            return  # saldiracak gucu yok
+
+        inflicted = min(urge * damage, other.energy)
+        a.energy -= cost
+        if inflicted > 0.0:
+            other.energy -= inflicted
+            other.damage_taken += inflicted
+            gained = inflicted * steal
+            a.energy = min(self.physics.energy_max, a.energy + gained)
+            a.stolen += gained
+            a.damage_dealt += inflicted
+        a.attacks_made += 1
+
+        stats["attack_events"] += 1
+        stats["attack_damage"] += inflicted
+        stats["attack_kin" if kin else "attack_nonkin"] += 1
+        stats[f"{'atk_kin' if kin else 'atk_non'}_{bucket}"] += 1
+        if other.energy <= 0.0:
+            other.death_cause = "killed"
+            stats["attack_kills"] += 1
+        self.attack_events.append((a.x, a.y, other.x, other.y, kin))
 
     def _shuffle_surnames(self) -> None:
         """KONTROL: soyisimleri yasayanlar arasinda karistirir.
@@ -560,6 +613,7 @@ def _empty_stats() -> dict:
         "death_starved": 0,
         "death_hazard": 0,
         "death_old_age": 0,
+        "death_killed": 0,
         "food_eaten": 0.0,
         # --- Faz 3 ---
         "share_events": 0,      # gerceklesen paylasim sayisi
@@ -571,9 +625,17 @@ def _empty_stats() -> dict:
         "share_cost": 0.0,      # verenlerin toplam kaybi   (Hamilton c)
         "share_benefit": 0.0,   # alicilarin toplam kazanci (Hamilton b)
         "share_rescue": 0,      # olmek uzere olan bir aliciya yapilan paylasim
+        # --- Faz 3 adim 2: saldiri ---
+        "attack_events": 0,
+        "attack_damage": 0.0,
+        "attack_kills": 0,
+        "attack_kin": 0,
+        "attack_nonkin": 0,
         # Enerji katmanli sayimlar (konfound duzeltmesi icin)
         **{f"opp_kin_{b}": 0 for b in range(ENERGY_BUCKETS)},
         **{f"opp_non_{b}": 0 for b in range(ENERGY_BUCKETS)},
         **{f"shr_kin_{b}": 0 for b in range(ENERGY_BUCKETS)},
         **{f"shr_non_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"atk_kin_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"atk_non_{b}": 0 for b in range(ENERGY_BUCKETS)},
     }

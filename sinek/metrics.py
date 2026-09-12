@@ -23,6 +23,7 @@ BASE_COLUMNS = [
     "death_starved",
     "death_hazard",
     "death_old_age",
+    "death_killed",
     "mean_energy",
     "std_energy",
     "mean_age",
@@ -53,6 +54,15 @@ BASE_COLUMNS = [
     "kin_assortment",     # (gozlenen-beklenen)/(1-beklenen)  ~ Hamilton'un r'si
     "bc_ratio",           # gerceklesen b/c (ham enerjide yapisal olarak <= 1)
     "rescue_share",       # paylasimlarin kaci olmek uzere olan birine gitti
+    # --- Faz 3 adim 2: saldiri (dort hucreli matrisin ikinci satiri) ---
+    "attack_events",
+    "attack_damage",
+    "attack_kills",
+    "hostility_rate",     # saldiri / firsat
+    "attack_in_group",    # P(saldir | en yakin AKRABA)
+    "attack_out_group",   # P(saldir | en yakin YABANCI)
+    "attack_kin_bias",    # ham fark (akrabaya saldiri egilimi) — KONFOUNDLU
+    "attack_kin_bias_adj",# enerji katmanli duzeltilmis fark
 ]
 
 
@@ -361,6 +371,8 @@ def social_rates(stats: dict) -> dict[str, float]:
     opp_non = float(stats.get("opp_nonkin", 0))
     in_rate = stats.get("share_kin", 0) / opp_kin if opp_kin else 0.0
     out_rate = stats.get("share_nonkin", 0) / opp_non if opp_non else 0.0
+    atk_in = stats.get("attack_kin", 0) / opp_kin if opp_kin else 0.0
+    atk_out = stats.get("attack_nonkin", 0) / opp_non if opp_non else 0.0
     total_opp = opp_kin + opp_non
     return {
         "share_events": stats.get("share_events", 0),
@@ -376,6 +388,15 @@ def social_rates(stats: dict) -> dict[str, float]:
         "rescue_share": round(
             _ratio(stats.get("share_rescue", 0), stats.get("share_events", 0)), 5
         ),
+        # --- saldiri: paylasimla BIREBIR ayni sekilde, firsata kosullu ---
+        "attack_events": stats.get("attack_events", 0),
+        "attack_damage": round(float(stats.get("attack_damage", 0.0)), 3),
+        "attack_kills": stats.get("attack_kills", 0),
+        "hostility_rate": round(stats.get("attack_events", 0) / total_opp, 5) if total_opp else 0.0,
+        "attack_in_group": round(atk_in, 5),
+        "attack_out_group": round(atk_out, 5),
+        "attack_kin_bias": round(atk_in - atk_out, 5),
+        "attack_kin_bias_adj": round(stratified_kin_bias(stats, action="atk"), 5),
     }
 
 
@@ -384,7 +405,7 @@ def _ratio(num, den) -> float:
     return float(num) / den if den > 1e-12 else 0.0
 
 
-def stratified_kin_bias(stats: dict, buckets: int = 5) -> float:
+def stratified_kin_bias(stats: dict, action: str = "shr", buckets: int = 5) -> float:
     """Verici enerjisine gore katmanlanmis akrabalik ayrimciligi.
 
     NEDEN GEREKLI: akrabalar uzamsal olarak kumelenir, kumeler zengin yemek
@@ -398,6 +419,9 @@ def stratified_kin_bias(stats: dict, buckets: int = 5) -> float:
     Bu fonksiyon karsilastirmayi AYNI enerji katmani icinde yapar ve
     Mantel-Haenszel agirligiyla birlestirir. Katmanlar disi enerji farki
     boylece notrlenir.
+
+    `action`: "shr" (paylasim) ya da "atk" (saldiri). Ayni konfound saldiri
+    icin de gecerlidir, bu yuzden ayni duzeltme iki eyleme de uygulanir.
     """
     num = den = 0.0
     for b in range(buckets):
@@ -406,7 +430,9 @@ def stratified_kin_bias(stats: dict, buckets: int = 5) -> float:
         if ok <= 0 or on <= 0:
             continue
         w = ok * on / (ok + on)
-        num += w * (stats.get(f"shr_kin_{b}", 0) / ok - stats.get(f"shr_non_{b}", 0) / on)
+        num += w * (
+            stats.get(f"{action}_kin_{b}", 0) / ok - stats.get(f"{action}_non_{b}", 0) / on
+        )
         den += w
     return num / den if den else 0.0
 

@@ -17,6 +17,10 @@ python run.py --config experiments/<dosya>.yaml
 | `faz3_kontrol_akrabalik.yaml` | **Asil Faz 3 kontrolu:** soyisim kalitsal degil |
 | `faz3_kontrol_karistir.yaml` | Soyisimler her adim karistirilir (en sert kontrol) |
 | `faz3_kontrol_dagit.yaml` | Yavrular haritaya rastgele dagilir (uzamsal yapi yok) |
+| `faz3_azalan_verim.yaml` | Adim 1.5: need_bonus ile b/c tavani kalkar, paylasim yasar |
+| `faz3_azalan_kontrol.yaml` | Ayni rejim + soyisim karistirma kontrolu |
+| `faz3b_saldiri.yaml` | **Adim 2:** saldiri acik, dort hucreli in/out olcumu |
+| `faz3b_kontrol.yaml` | Adim 2 karistirma kontrolu |
 
 Tek seferlik degisiklikler icin dosya acmaya gerek yok:
 

@@ -1,0 +1,12 @@
+Sonda: ayni sensor vektoru, yalnizca akrabalik kanali degisiyor.
+       fark = ortalama(motor | akraba) - ortalama(motor | yabanci)
+       100 sensor ornegi x genom basina
+
+  kayit                           genom |  PAYLAS fark  kayiran |  SALDIR fark  kayiran
+  faz3b_saldiri                     700 |      +0.0194    61.0% |      +0.0419    56.1%
+  faz3b_kontrol                     700 |      +0.0186    56.6% |      -0.0053    46.6%
+  faz2                              120 |      +0.0000     0.0% |      +0.0000     0.0%
+
+  fark ~0 ve kayiran ~%50 ise beyin akrabalik kanalini OKUMUYOR demektir.
+  Parochial imza: PAYLAS farki POZITIF (akrabaya cok) ve
+                  SALDIR farki NEGATIF (akrabaya az) olmali.

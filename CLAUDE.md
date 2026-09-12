@@ -32,7 +32,8 @@ davranış oradan **türer**.
 | **Faz 2** | Mutasyon + seçilim + evrimleşebilir recurrent sinir ağı | ✅ **tamam** |
 | **Faz 3 — adım 1** | Soyisim + akrabalık sensörü + paylaşma + kontrol grupları | ✅ **tamam** |
 | **Faz 3 — adım 1.5** | Hamilton kuralı `r·b/c` taraması; yapısal engelin bulunması | ✅ **tamam** |
-| **Faz 3 — adım 2** | `attack`, tam in/out-group düşmanlık analizi | ⏳ onay bekliyor |
+| **Faz 3 — adım 2** | `attack` + dört hücreli in/out analizi | ✅ **tamam** |
+| **Faz 4** | Doğal avcı, melez soyisim, soy-arası ilişki matrisi | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 3).
 Önceki fazlar `experiments/` altındaki hazır konfigürasyonlarla tek komutta
@@ -69,6 +70,7 @@ tools/plot_metrics.py   metrics.csv / generations.csv → PNG grafik
 tools/benchmark_genomes.py  Evrimleşmiş koloni vs acemi koloni, aynı dünyada
 tools/kin_probe.py      Akrabalık sensörü sondası: beyin akrabalığı okuyor mu?
 tools/sweep_hamilton.py Hamilton kuralı rejim taraması (her rejim + kontrolü)
+tools/parochial_report.py  Dört hücreli in/out matrisi + birlikte hareket
 tests/                  unittest — determinizm + Faz 1 + Faz 2 testleri
 ```
 
@@ -85,8 +87,12 @@ SENSOR_NAMES = [bias, energy, age, food_here, food_fwd, food_left,
                 food_strength, hazard_fwd, hazard_left, hazard_near,
                 mate_fwd, mate_left, crowd,
                 kin, near_agent]                    # Faz 3
-MOTOR_NAMES  = [turn, thrust, eat, share]           # share: Faz 3
+MOTOR_NAMES  = [turn, thrust, eat, share, attack]   # Faz 3
 ```
+
+`share` ve `attack` aynı komşuyu hedefler ve **birbirini dışlar**: hangisi
+kendi eşiğini daha çok aşıyorsa o gerçekleşir. Böylece "verecek miyim /
+alacak mıyım" tek bir karar olarak evrimleşir.
 
 `kin` ve `near_agent` **ayrı** kanallardır. Tek kanalda `{-1, 0, +1}` ile
 "akraba mı" ile "menzilde biri var mı" ayrılamaz; o kanala düşen ağırlık
@@ -100,9 +106,6 @@ başta görmez, davranış birebir korunur, mutasyon zamanla bağlantıyı açar
 Yön sensörleri **egosentrik**: `_fwd` = sineğin baktığı yön bileşeni,
 `_left` = sol bileşeni. Beyin mutlak koordinat bilmeden çalışır — evrimleşebilir
 bir ağ için şart.
-
-`social` motoru Faz 2'de üretilir ama yok sayılır; Faz 3'te
-`>0 → paylaş`, `<0 → saldır` olacak.
 
 ### Beyin backend'leri
 
@@ -300,6 +303,17 @@ Sonuç: `b/c` 0.73 → 1.16, paylaşım oranı %2.09 → %6.02, kontrolden ayrı
 geçebildiğini doğrulayın**, yoksa negatif sonuç mekanizmadan değil
 muhasebeden gelir.
 
+### Saldırı (`rules.attack`)
+
+Paylaşımla aynı iskelet: en yakın komşuyu hedefler, eşik aşılırsa gerçekleşir,
+in/out ayrı ölçülür, enerji katmanlı düzeltme `stratified_kin_bias(action="atk")`
+ile aynı fonksiyondan gelir.
+
+**Maliyet sabit, kazanç hedefin enerjisiyle sınırlı** — fakire saldırmak net
+zarardır. Bu, "herkes herkese saldırır" dejenere çözümünü engeller.
+Saldırı da **ödüllendirilmez**: `attacks_made`, `damage_dealt`, `stolen`
+yalnızca ölçüm içindir (`test_fitness_has_no_attack_term`).
+
 ### ⚠ `kin_bias` tek başına kanıt değildir
 
 Akrabalar uzamsal kümelenir → kümeler zengin yamalardadır → oradaki sinekler
@@ -415,6 +429,10 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `kin_expected`, `kin_observed` | assortment'in taban çizgisi ve gözlemi |
 | `bc_ratio` | gerçekleşen `b/c` — doğrusal aktarımda yapısal olarak ≤ 1 |
 | `rescue_share` | paylaşımların kaçı ölmek üzere olan birine gitti |
+| `attack_events`, `attack_damage`, `attack_kills`, `death_killed` | saldırı muhasebesi |
+| `hostility_rate` | saldırı / fırsat |
+| `attack_in_group`, `attack_out_group` | `P(saldır \| akraba)`, `P(saldır \| yabancı)` |
+| `attack_kin_bias`, `attack_kin_bias_adj` | saldırıda akrabalık ayrımcılığı (ham / düzeltilmiş) |
 | `gp_<parametre>` | her genom parametresinin popülasyon ortalaması — evrimin **yönü** |
 | `cooperation_rate` | Faz 3 için ayrılmış |
 
@@ -485,6 +503,37 @@ Tam tablo ve görseller: **[docs/faz3/](docs/faz3/)**
 - Soy çeşitliliği 300 kurucu → 14 soy (etkin 4.9). Ölçüm için yeterli ama
   daha uzun koşumlarda `lineage_effective` ve `opp_kin` izlenmeli.
 
+### Faz 3 adım 2 (seed 42, 12000 adım = 24 dönem)
+
+Tam tablo: **[docs/faz3/adim2_parochial.md](docs/faz3/adim2_parochial.md)**
+
+Dört hücreli matris (son çeyrek, fırsata koşullu):
+
+| | asıl in-grup | asıl dış-grup | kontrol in | kontrol dış |
+|---|---|---|---|---|
+| PAYLAŞ | **56.11%** | 21.51% | 4.85% | 4.47% |
+| SALDIR | 5.10% | 3.84% | 4.09% | 4.18% |
+
+- **Grup-içi fedakârlık evrimleşti.** Paylaşım in/out oranı ×2.6; düzeltilmiş
+  ayrımcılık +28…+57 puan, kontrolde +0.3…+1.1 (≈50× fark). Kontrolün dört
+  hücresi birbirinin aynı — kontrol tam olarak yapması gerekeni yaptı.
+- **Grup-dışı düşmanlık EVRİMLEŞMEDİ.** Saldırı in-grupta biraz daha yüksek
+  (%5.10 vs %3.84); düzeltilmiş saldırı ayrımcılığı kararsız (−2.6 … +3.5) ve
+  paylaşımdan ~20× küçük. Saldırı oranı **kontrolde de birebir aynı şekilde**
+  yükseliyor (1.3% → 4.1%): saldırı bir strateji olarak evrimleşiyor ama
+  **akrabalığa kör**.
+- **"İyilik ve öteki'ne kötülük aynı madalyonun iki yüzü" — bu kurulumda
+  değil.** Sebep: saldırının kârlılığı hedefin akrabalığına değil
+  **zenginliğine** bağlı (maliyet sabit, kazanç hedefin enerjisiyle sınırlı).
+  Ayrıca komşuların %84'ü akraba; yabancı zaten nadir.
+- Sonda yine simülasyon içi ölçüden **zayıf** çıkıyor (paylaşımda %61.0 vs
+  kontrol %56.6). Sonda rastgele sensör uzayında ortalama duyarlılık ölçer;
+  gerçek koşumda beyin dar bir bölgede çalışır. İkisi ayrı raporlanır.
+- Sınır: etkin soy 4.7'ye düştü (`max_speed 0.20` akrabaları bir arada tutuyor
+  — assortment 0.751'i mümkün kılan da, dış-grup örneklemini küçülten de bu).
+  Misilleme/hafıza/itibar ve **gruplar arası rekabet** yok; literatürde
+  parochial düşmanlık genelde o baskı altında çıkar.
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -511,22 +560,24 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
 
 ---
 
-## 7. Faz 3 adım 2'ye geçerken yapılacaklar
+## 7. Faz 4'e geçerken yapılacaklar
 
-1. `MOTOR_NAMES`'in **sonuna** `attack` eklenecek (mevcut indeksler kaymasın).
-   Genom boyutu değişir; `migrate_weights` yeni motor satırını sıfırla ekler,
-   yani Faz 3 adım 1'in popülasyonu kaybolmadan taşınır.
-2. `simulation._apply_social_rules()` → `rules.attack` şu an bilerek
-   `NotImplementedError` atıyor; enerji çalma + hedefe zarar oraya yazılacak.
-   Uzamsal hash ve "en yakın komşu" önbelleği zaten hazır.
-3. Metrik: `attack_in_group` / `attack_out_group` ve saldırı için de
-   **enerji katmanlı** düzeltme (`stratified_kin_bias` yeniden kullanılabilir).
-4. **Başarı ölçütü ve asıl felsefi soru**: in-group paylaşım ile out-group
-   saldırı *birlikte* mi yükseliyor? Kontrol grubu şart — Faz 3 adım 1'de
-   ham metrik kontrolsüz okunsaydı yanlış bir "akrabalık seçilimi bulundu"
-   sonucu raporlanacaktı.
-5. Faz 3 adım 1'in kazananlarıyla başlamak için:
-   `python run.py --load-genomes runs/faz3/population.npz`
+1. **Doğal avcı**: dünyaya hareketli tehdit. `rules` altında ayrı bir blok;
+   `world.hazard` sabit disklerin aksine ajanları takip eder. Gruplar arası
+   ortak tehdit, adım 2'de çıkmayan **grup-dışı düşmanlığın** literatürdeki
+   tetikleyicisidir — asıl test bu olabilir.
+2. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
+   etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
+   etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
+   değiştirmek bu kodu bozmaz — kısmi akrabalık isteniyorsa
+   `agent.sense`'teki `kin` hesabı sürekli bir orana çevrilir.
+3. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
+   `(soy_i, soy_j)` matrisine genişletilecek. `stratified_kin_bias`
+   `action` parametresiyle zaten genel; hücre başına da uygulanabilir.
+4. **Gruplar arası rekabet** eklenmeden parochial düşmanlık beklenmemeli
+   (bkz. adım 2 sonucu).
+5. Adım 2'nin kazananlarıyla başlamak:
+   `python run.py --load-genomes runs/faz3b_saldiri/population.npz`
 
 ---
 

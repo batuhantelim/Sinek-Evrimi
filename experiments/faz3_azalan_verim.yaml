@@ -20,5 +20,7 @@ agents:
   reproduction:
     spawn_radius: 0.3
 rules:
+  attack:
+    enabled: false        # bu deney saldirisiz kurulmustu
   share:
     need_bonus: 3.0

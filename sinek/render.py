@@ -87,14 +87,18 @@ def render(sim) -> np.ndarray:
     if hud_h:
         img[:hud_h] = HUD_BG
 
-    # --- paylasim olaylari (ajanlarin ALTINA cizilir ki noktalar ustte kalsin) ---
+    # --- sosyal olaylar (ajanlarin ALTINA cizilir ki noktalar ustte kalsin) ---
     if bool(cfg.get("viz.show_share", True)):
-        for x1, y1, x2, y2, kin in getattr(sim, "share_events", ()):
+        events = [(e, True) for e in getattr(sim, "share_events", ())]
+        events += [(e, False) for e in getattr(sim, "attack_events", ())]
+        for (x1, y1, x2, y2, kin), is_share in events:
             dx, dy = world.delta(x1, y1, x2, y2)
             if math.hypot(dx, dy) > world.width * 0.25:
                 continue  # sarmali dunyada ekrani boydan boya kesen cizgi cizme
-            # akrabaya paylasim parlak yesil, yabanciya soluk camgobegi
-            col = (170, 255, 190) if kin else (80, 150, 175)
+            if is_share:  # paylasim: akrabaya parlak yesil, yabanciya soluk
+                col = (170, 255, 190) if kin else (80, 150, 175)
+            else:         # saldiri: akrabaya parlak kirmizi, yabanciya soluk
+                col = (255, 140, 120) if kin else (190, 80, 70)
             _line(
                 img,
                 int(x1 * scale), int(y1 * scale) + hud_h,
@@ -163,9 +167,10 @@ def _draw_hud(img: np.ndarray, sim, w_px: int, hud_h: int) -> None:
     )
     if getattr(sim, "_share_on", False):
         line2 = (
-            f"AKRABAYA PAYLASIM {row.get('coop_in_group', 0.0) * 100:5.2f}%   "
-            f"YABANCIYA {row.get('coop_out_group', 0.0) * 100:5.2f}%   "
-            f"FARK {row.get('kin_bias', 0.0) * 100:+5.2f}   SEED {sim.seed}"
+            f"PAYLAS IC {row.get('coop_in_group', 0.0) * 100:5.2f}% "
+            f"DIS {row.get('coop_out_group', 0.0) * 100:5.2f}%   "
+            f"SALDIR IC {row.get('attack_in_group', 0.0) * 100:5.2f}% "
+            f"DIS {row.get('attack_out_group', 0.0) * 100:5.2f}%   SEED {sim.seed}"
         )
     else:
         line2 = (

@@ -225,7 +225,15 @@ class TestExperimentValidity(unittest.TestCase):
         a = sim.agents[0]
         base = a.fitness(sim.fitness_weights)
         a.given, a.received, a.shares_made = 500.0, 500.0, 99
+        a.attacks_made, a.damage_dealt, a.stolen = 99, 500.0, 500.0
         self.assertEqual(a.fitness(sim.fitness_weights), base)
+
+    def test_fitness_has_no_attack_term(self):
+        """KURAL 2 saldiri icin de gecerli: 'yabanciya saldirdin diye +puan' YOK."""
+        cfg = load_config()
+        weights = cfg.get("evolution.fitness").to_dict()
+        for banned in ("attack", "attacks_made", "damage_dealt", "stolen", "hostility"):
+            self.assertNotIn(banned, weights, f"fitness'a saldiri terimi sizmis: {banned}")
 
     def test_social_rates_are_conditional_probabilities(self):
         """Ham sayim degil, FIRSATA kosullu oran olculmeli."""
@@ -266,12 +274,6 @@ class TestExperimentValidity(unittest.TestCase):
         stats.update(opp_kin_2=500, shr_kin_2=300, opp_non_2=500, shr_non_2=100)
         self.assertAlmostEqual(stratified_kin_bias(stats), 0.4, places=6)
 
-    def test_attack_still_guarded(self):
-        """Faz 3 adim 2 sinirina saygi: sessizce yok sayma, patla."""
-        sim = make(rules__attack__enabled=True)
-        with self.assertRaises(NotImplementedError):
-            sim.step()
-
     def test_no_caste_is_hardcoded(self):
         """KURAL 1: kraliçe/isci gibi roller kodda gecmemeli."""
         import pathlib
@@ -281,6 +283,70 @@ class TestExperimentValidity(unittest.TestCase):
             text = path.read_text(encoding="utf-8").lower()
             for word in banned:
                 self.assertNotIn(word, text, f"{path}: rol kodlanmis gorunuyor ({word})")
+
+
+class TestAttackMechanics(unittest.TestCase):
+    def _duel(self, target_energy, **over):
+        sim = make(agents__initial_count=2, **over)
+        a, b = sim.agents
+        a.x, a.y = 30.0, 30.0
+        b.x, b.y = 30.4, 30.0
+        a.energy, b.energy = 120.0, target_energy
+        a.nearest, b.nearest = b, None
+        for agent in sim.agents:
+            agent.last_motors = np.zeros(len(M), dtype=np.float32)
+        a.last_motors[M["attack"]] = 1.0
+        before = (a.energy, b.energy)
+        sim._apply_social_rules()
+        return sim, a, b, before
+
+    def test_attack_transfers_and_damages(self):
+        sim, a, b, (a0, b0) = self._duel(100.0, rules__attack__cost=2.0,
+                                         rules__attack__damage=8.0,
+                                         rules__attack__steal_ratio=0.5)
+        self.assertEqual(sim.stats_step["attack_events"], 1)
+        self.assertAlmostEqual(b0 - b.energy, 8.0, places=5, msg="hedef zarar gormedi")
+        # saldirgan: -cost +calinan
+        self.assertAlmostEqual(a.energy - a0, -2.0 + 4.0, places=5)
+
+    def test_attacking_a_poor_target_is_a_net_loss(self):
+        """Maliyet sabit, kazanc hedefin enerjisiyle sinirli -> fakire saldirmak zarar.
+
+        'Herkes herkese saldirir' dejenere cozumunu engelleyen sey budur.
+        """
+        _sim, a, _b, (a0, _b0) = self._duel(1.0, rules__attack__cost=2.0,
+                                            rules__attack__damage=8.0,
+                                            rules__attack__steal_ratio=0.5)
+        self.assertLess(a.energy, a0, "fakir hedefe saldiri saldirgana kar getirmis")
+
+    def test_share_and_attack_are_mutually_exclusive(self):
+        sim = make(agents__initial_count=2)
+        a, b = sim.agents
+        a.x, a.y = 10.0, 10.0
+        b.x, b.y = 10.3, 10.0
+        a.energy, b.energy = 140.0, 40.0
+        a.nearest, b.nearest = b, None
+        a.last_motors = np.zeros(len(M), dtype=np.float32)
+        b.last_motors = np.zeros(len(M), dtype=np.float32)
+        a.last_motors[M["share"]] = 1.0
+        a.last_motors[M["attack"]] = 0.9          # ikisi de esigin ustunde
+        sim._apply_social_rules()
+        self.assertEqual(sim.stats_step["share_events"] + sim.stats_step["attack_events"], 1)
+        self.assertEqual(sim.stats_step["share_events"], 1, "daha buyuk marj kazanmali")
+
+    def test_lethal_attack_is_attributed(self):
+        sim, a, b, _ = self._duel(3.0, rules__attack__damage=8.0)
+        self.assertLessEqual(b.energy, 0.0)
+        self.assertEqual(sim.stats_step["attack_kills"], 1)
+        sim.agents = [a, b]
+        sim.step()  # olum muhasebesi bir sonraki adimda islenir
+        self.assertNotIn(b, sim.agents)
+
+    def test_stratified_correction_applies_to_attack_too(self):
+        stats = {f"opp_kin_{b}": 0 for b in range(5)}
+        stats.update({f"opp_non_{b}": 0 for b in range(5)})
+        stats.update(opp_kin_1=400, atk_kin_1=100, opp_non_1=400, atk_non_1=300)
+        self.assertAlmostEqual(stratified_kin_bias(stats, action="atk"), -0.5, places=6)
 
 
 class TestControls(unittest.TestCase):

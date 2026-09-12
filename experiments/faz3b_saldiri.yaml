@@ -1,0 +1,23 @@
+# FAZ 3 adım 2 — saldiri (attack) + dort hucreli in/out olcum.
+#
+# Rejim: adim 1.5'te paylasimin nefes aldigi r_azalan + need_bonus.
+# Baska bir rejimde kurulursa saldiri da ayni b/c <= 1 muhasebe tavanina
+# carpar ve yorumlanamaz negatif verir.
+#
+# Asil soru: in-grup fedakarlik ile dis-grup dusmanlik BIRLIKTE mi
+# evrimlesiyor? (parochial altruism)
+#   python run.py --config experiments/faz3b_saldiri.yaml --load-genomes docs/faz2/population.npz
+run:
+  name: faz3b_saldiri
+  steps: 12000
+agents:
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+rules:
+  share:
+    need_bonus: 3.0
+  attack:
+    enabled: true

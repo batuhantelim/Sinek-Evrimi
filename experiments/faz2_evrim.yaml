@@ -12,6 +12,8 @@ evolution:
   mode: generational
   generation_length: 250
 rules:
+  attack:
+    enabled: false        # bu deney saldirisiz kurulmustu
   share:
     enabled: false
 viz:
