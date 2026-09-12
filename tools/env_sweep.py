@@ -94,15 +94,21 @@ def classify_hostility(r: dict) -> tuple[str, str]:
     targeted = r["attack_t"] <= -2.0 and atk_out > 1.2 * atk_in
     blind = atk_in >= 0.8 * atk_out
 
+    ratio = atk_out / max(atk_in, 1e-9)
     if hostility < 1.5 * BASELINE_HOSTILITY:
-        return "artmadi", f"saldiri %{hostility * 100:.1f} — tabana yakin, ayrim sorusu dusmuyor"
+        # SEVIYE ile YON ayri sorulardir: saldiri artmamis olabilir ama olan
+        # saldiri yine de yabanciya hedefli olabilir. Ikincisini gizleme.
+        return "artmadi", (
+            f"saldiri %{hostility * 100:.1f} tabana yakin (D/C sorusu dusmuyor); "
+            f"ama YON: dis/ic {ratio:.2f}x, atk_t {r['attack_t']:+.1f}"
+        )
     if collapse:
         return "C", f"populasyon {r['pop_start']:.0f} -> {r['pop_end']:.0f} (cokus)"
     if targeted and not blind:
-        return "D", f"atk_t {r['attack_t']:+.1f}, dis/ic saldiri {atk_out / max(atk_in, 1e-9):.2f}x, koloni ayakta"
+        return "D", f"atk_t {r['attack_t']:+.1f}, dis/ic saldiri {ratio:.2f}x, koloni ayakta"
     if blind:
         return "C", f"in ve out birlikte yuksek (ic %{atk_in * 100:.1f} / dis %{atk_out * 100:.1f})"
-    return "belirsiz", f"atk_t {r['attack_t']:+.1f}, dis/ic {atk_out / max(atk_in, 1e-9):.2f}x"
+    return "belirsiz", f"atk_t {r['attack_t']:+.1f}, dis/ic {ratio:.2f}x"
 
 
 def evaluate(name: str, seed: int, steps: int, seed_pop: str | None) -> dict:

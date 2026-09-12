@@ -139,6 +139,21 @@ class TestHostilityClassifier(unittest.TestCase):
         kind, _why = self.case(hostility=0.045, attack_t=+0.9)
         self.assertEqual(kind, "artmadi")
 
+    def test_level_and_direction_are_reported_separately(self):
+        """Saldiri artmamis olsa bile YON bilgisi gizlenmemeli.
+
+        B_bol'da saldiri tabanin altinda (%2.0) ama dis/ic orani 3x ve
+        atk_t -13.3 idi: seviye sorusu 'artmadi' der, yon sorusu 'yabanciya'.
+        Gerekce metni ikisini de icermeli.
+        """
+        kind, why = self.case(
+            hostility=0.0198, q_attack_in_group=0.0103, q_attack_out_group=0.0305,
+            attack_t=-13.27,
+        )
+        self.assertEqual(kind, "artmadi")
+        self.assertIn("YON", why)
+        self.assertIn("2.96x", why)
+
     def test_collapse_check_precedes_targeting(self):
         """Sira onemli: cokus kontrolu hedeflilik kontrolunden ONCE gelmeli,
         yoksa cokmekte olan koloniler yanlislikla 'D' etiketlenir."""
