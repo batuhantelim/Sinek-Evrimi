@@ -155,6 +155,48 @@ class TestShareMechanics(unittest.TestCase):
         self.assertGreater(gained, 0.0, "transfer olmadi")
         self.assertAlmostEqual(lost - gained, 1.5, places=5, msg="islem maliyeti uygulanmadi")
 
+    def test_sharing_conserves_energy_by_default(self):
+        """KORUNUM. Paylasim enerji YARATMAMALI.
+
+        Faz 4.5'te eklendi: `need_bonus` "alicinin donusum verimi" diye
+        belgelenmisken GERCEK enerji olarak uygulaniyordu. %90 isbirligi olan
+        bir kosumda paylasimin urettigi enerji yenen yemege esitleniyordu —
+        koloniyi cevre degil bu pompa besliyordu.
+        """
+        sim = make(steps=400, agents__initial_count=150, rules__share__need_bonus=3.0)
+        self.assertGreater(sim.stats_total["share_events"], 0, "hic paylasim olmadi, test bos")
+        self.assertAlmostEqual(sim.stats_total["energy_created"], 0.0, places=6)
+
+    def test_recipient_never_gains_more_than_the_giver_loses(self):
+        """Tek transferde ham enerji korunumu, need_bonus acikken."""
+        sim = make(agents__initial_count=2, rules__share__need_bonus=3.0)
+        a, b = sim.agents
+        a.x, a.y = 12.0, 12.0
+        b.x, b.y = 12.4, 12.0
+        a.energy, b.energy = 150.0, 10.0     # alici cok ac -> carpan azami
+        a.nearest, b.nearest = b, None
+        force_share(sim, 1.0)
+        before_a, before_b = a.energy, b.energy
+        sim._apply_social_rules()
+        lost, gained = before_a - a.energy, b.energy - before_b
+        self.assertGreater(gained, 0.0, "transfer olmadi")
+        self.assertLessEqual(gained, lost + 1e-9, "alici vericinin kaybindan fazlasini aldi")
+        self.assertAlmostEqual(sim.stats_total["energy_created"], 0.0, places=9)
+
+    def test_energy_mode_is_explicitly_non_conservative(self):
+        """Eski mod hala uretilebilir — ama SESSIZ degil: kendi sayaciyla
+        enerji yarattigini itiraf eder."""
+        sim = make(
+            steps=400, agents__initial_count=150,
+            rules__share__need_bonus=3.0, rules__share__need_mode="energy",
+        )
+        self.assertGreater(sim.stats_total["share_events"], 0, "hic paylasim olmadi, test bos")
+        self.assertGreater(sim.stats_total["energy_created"], 0.0)
+
+    def test_unknown_need_mode_fails_loudly(self):
+        with self.assertRaises(ValueError):
+            make(steps=1, rules__share__need_mode="sihirli")
+
     def test_giver_never_falls_below_floor(self):
         sim = make(agents__initial_count=2, rules__share__min_donor_energy=30.0)
         a, b = sim.agents

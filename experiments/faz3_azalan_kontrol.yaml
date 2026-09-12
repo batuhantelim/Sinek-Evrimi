@@ -17,5 +17,9 @@ rules:
     enabled: false        # bu deney saldirisiz kurulmustu
   share:
     need_bonus: 3.0
+    # Bu deney need_bonus'un ENERJI olarak uygulandigi surumde kosuldu:
+    # paylasim koloniye net enerji EKLIYORDU (bkz. docs/faz45/). Varsayilan
+    # artik korunumlu; eski sonuclari yeniden uretebilmek icin acikca pinlenir.
+    need_mode: energy
   kinship:
     control: shuffle_surnames

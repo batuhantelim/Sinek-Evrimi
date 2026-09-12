@@ -34,6 +34,10 @@ REGIME = [
     "agents.motors.max_turn=0.25",
     "agents.reproduction.spawn_radius=0.3",
     "rules.share.need_bonus=3.0",
+    # Bu rejim, need_bonus'un ENERJI olarak uygulandigi surumde olculdu.
+    # Varsayilan artik korunumlu (Faz 4.5); eski taramalar yeniden
+    # uretilebilsin diye acikca pinleniyor.
+    "rules.share.need_mode=energy",
     "rules.attack.enabled=true",
     # Faz 4 avcisi bu rejimin parcasi DEGIL: config.yaml varsayilani ilerledi
     # diye adim 2 taramasi sessizce baska bir deney olmasin.

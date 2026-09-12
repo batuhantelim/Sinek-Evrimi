@@ -192,6 +192,17 @@ rules:
     #   0.0 = dogrusal (adim 1 davranisi)
     #   3.0 = olmek uzere olan alici 4 kat verim alir
     need_bonus: 0.0
+    # need_bonus NASIL uygulanir:
+    #   fitness (varsayilan) — KORUNUMLU. Alici en fazla aktarilani alir;
+    #     carpan yalnizca Hamilton muhasebesindeki b'ye girer. "Ayni kalori
+    #     ac bir aliciya daha degerlidir" bir FITNESS iddiasidir.
+    #   energy — ESKI davranis (Faz 3 adim 1.5 – Faz 4 tanisi). Alici carpanla
+    #     birlikte gercek enerji alir; transfer KORUNUMLU DEGILDIR, her
+    #     paylasim koloniye net enerji EKLER. %90 isbirligi olan bir kosumda
+    #     uretilen enerji yenen yemege esitleniyordu — populasyonun cevreden
+    #     degil bu pompadan sinirlanmasinin sebebi buydu (docs/faz45/).
+    #     Yalnizca eski sonuclari yeniden uretmek icin.
+    need_mode: fitness
 
   attack:
     # FAZ 3 ADIM 2. Paylasimla ayni komsuyu hedefler; hangi motor esigini daha

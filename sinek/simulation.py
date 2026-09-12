@@ -483,6 +483,12 @@ class Simulation:
         # aclıktan olur. Dogrusal olmayan faydanin gerceklestigi yer burasi.
         rescue_level = 20.0 * self.physics.metabolism
         need_bonus = float(sh.get("need_bonus", 0.0))
+        need_mode = str(sh.get("need_mode", "fitness"))
+        if need_mode not in ("fitness", "energy"):
+            raise ValueError(
+                f"bilinmeyen rules.share.need_mode: {need_mode!r} "
+                "(fitness | energy) — sessizce varsayilana dusulmez"
+            )
         stats = self.stats_step
 
         for a in self.agents:
@@ -537,14 +543,29 @@ class Simulation:
             # ayni kalorinin ac bir aliciya daha degerli olmasini modeller.
             # Verene hicbir sey kazandirmaz — odul degil, alicinin donusum
             # verimidir. 0.0 = dogrusal (varsayilan, onceki davranis).
-            delivered = amount
-            if need_bonus > 0.0:
-                need = max(0.0, 1.0 - recipient_energy / e_max)
-                delivered = amount * (1.0 + need_bonus * need)
-            taken = min(delivered, e_max - other.energy)
+            need = max(0.0, 1.0 - recipient_energy / e_max)
+            multiplier = 1.0 + need_bonus * need if need_bonus > 0.0 else 1.0
+            headroom = e_max - other.energy
+            if need_mode == "energy":
+                # ESKI DAVRANIS (Faz 3 adim 1.5 – Faz 4 tanisi). Alici carpanla
+                # birlikte GERCEK enerji alir, yani transfer KORUNUMLU DEGILDIR:
+                # her paylasim koloniye net enerji EKLER. Olculdu: %90 isbirligi
+                # olan bir kosumda uretilen enerji, yenen yemege esit hale
+                # geliyordu (bkz. docs/faz45/). Yalnizca eski sonuclari
+                # yeniden uretmek icin korunuyor.
+                taken = min(amount * multiplier, headroom)
+            else:
+                # KORUNUMLU (varsayilan). Alici en fazla aktarilanin kendisini
+                # alir; carpan yalnizca MUHASEBEYE girer. "Ayni kalori ac bir
+                # aliciya daha degerlidir" iddiasi bir FITNESS iddiasidir,
+                # enerji yaratma izni degil.
+                taken = min(amount, headroom)
             if taken > 0.0:
                 other.energy += taken
                 other.received += taken
+            # Yaratilan/yok edilen enerji ACIKCA sayilir: korunumlu modda 0
+            # olmalidir (`test_sharing_conserves_energy` bunu bekler).
+            stats["energy_created"] += taken - min(amount, headroom)
 
             stats["share_events"] += 1
             stats["share_energy"] += amount
@@ -555,7 +576,9 @@ class Simulation:
             # fitness'a donusumu DOGRUSAL OLMADIGI yerde olabilir: olmek uzere
             # olan bir aliciya verilen enerji cok daha degerlidir.
             stats["share_cost"] += amount + overhead
-            stats["share_benefit"] += taken
+            # b FITNESS biriminde tahmin edilir: alinan enerji x alicinin
+            # donusum verimi. Enerji defterine dokunmaz.
+            stats["share_benefit"] += taken * (multiplier if need_mode != "energy" else 1.0)
             if recipient_energy < rescue_level:
                 stats["share_rescue"] += 1
             stats["share_kin" if kin else "share_nonkin"] += 1
@@ -684,6 +707,7 @@ def _empty_stats() -> dict:
         "share_cost": 0.0,      # verenlerin toplam kaybi   (Hamilton c)
         "share_benefit": 0.0,   # alicilarin toplam kazanci (Hamilton b)
         "share_rescue": 0,      # olmek uzere olan bir aliciya yapilan paylasim
+        "energy_created": 0.0,  # paylasimin yarattigi/yok ettigi net enerji (Faz 4.5)
         # --- Faz 3 adim 2: saldiri ---
         "attack_events": 0,
         "attack_damage": 0.0,
