@@ -24,6 +24,7 @@ BASE_COLUMNS = [
     "death_hazard",
     "death_old_age",
     "death_killed",
+    "death_predator",
     "mean_energy",
     "std_energy",
     "mean_age",
@@ -63,6 +64,10 @@ BASE_COLUMNS = [
     "attack_out_group",   # P(saldir | en yakin YABANCI)
     "attack_kin_bias",    # ham fark (akrabaya saldiri egilimi) — KONFOUNDLU
     "attack_kin_bias_adj",# enerji katmanli duzeltilmis fark
+    # --- Faz 4: dogal avci ---
+    "predator_strikes",
+    "predator_kills",
+    "predation_risk",     # oldurme / ajan  (kisi basi avlanma baskisi)
 ]
 
 
@@ -159,6 +164,9 @@ class Metrics:
             "clustering": _r(clustering_index(sim), 4),
             "behavior_diversity": _r(behavior_diversity(agents), 5),
             "weight_diversity": _r(weight_diversity(agents), 5),
+            "predator_strikes": sim.stats_step.get("predator_strikes", 0),
+            "predator_kills": sim.stats_step.get("predator_kills", 0),
+            "predation_risk": _r(sim.stats_step.get("predator_kills", 0) / max(1, n), 6),
         }
         lin = lineage_stats(agents)
         row.update(lin)

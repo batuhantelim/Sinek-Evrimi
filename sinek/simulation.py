@@ -36,6 +36,7 @@ from .agent import M, Agent
 from .brains import make_brain
 from .genome import Genome, founder_genome
 from .physics import Physics
+from .predator import PredatorPack
 from .metrics import (
     behavior_diversity,
     genome_param_means,
@@ -52,6 +53,7 @@ DEATH_KEYS = {
     "hazard": "death_hazard",
     "old_age": "death_old_age",
     "killed": "death_killed",
+    "predator": "death_predator",
 }
 
 #: Paylasim istatistiklerinin ayrildigi verici-enerjisi katmani sayisi.
@@ -124,6 +126,8 @@ class Simulation:
         for i, a in enumerate(self.agents):
             a.genome.surname = i
 
+        self.predators = PredatorPack(cfg, self.world, self.rng)
+
         self.generation = 0
         self.epoch_length = max(1, int(cfg.get("evolution.epoch_length", 500)))
         self.graveyard: list[Agent] = []  # bu neslin oluleri (secilim havuzunda kalirlar)
@@ -179,6 +183,10 @@ class Simulation:
             np.fromiter((a.x for a in self.agents), dtype=np.float32, count=len(self.agents)),
             np.fromiter((a.y for a in self.agents), dtype=np.float32, count=len(self.agents)),
         )
+        if self.predators.enabled:
+            for a in self.agents:
+                a.predator_signal = self.predators.signal(a.x, a.y)
+
         if self._social_enabled:
             # Faz 3: akrabalik sensoru ve paylasim ayni "en yakin komsu"yu
             # kullanir; bir kez hesaplanip onbellege alinir.
@@ -200,6 +208,12 @@ class Simulation:
         #      olan bir sinegi gercekten kurtarabilmeli.
         self._apply_social_rules()
 
+        # 3.6) avci: ajanlar hareket ettikten SONRA vurur, yani kacma sansi
+        #      gercekten ise yarayabilir.
+        strikes, kills = self.predators.step(self.agents)
+        self.stats_step["predator_strikes"] += strikes
+        self.stats_step["predator_kills"] += kills
+
         # 4) cevre etkileri
         metabolism = phys.metabolism
         for a in self.agents:
@@ -214,7 +228,11 @@ class Simulation:
         survivors = []
         for a in self.agents:
             if a.energy <= 0.0:
-                cause = a.death_cause if a.death_cause in ("hazard", "killed") else "starved"
+                cause = (
+                    a.death_cause
+                    if a.death_cause in ("hazard", "killed", "predator")
+                    else "starved"
+                )
                 self._kill(a, cause)
             elif a.age >= a.lifespan:
                 self._kill(a, "old_age")
@@ -620,7 +638,11 @@ def _empty_stats() -> dict:
         "death_hazard": 0,
         "death_old_age": 0,
         "death_killed": 0,
+        "death_predator": 0,
         "food_eaten": 0.0,
+        # --- Faz 4 ---
+        "predator_strikes": 0,
+        "predator_kills": 0,
         # --- Faz 3 ---
         "share_events": 0,      # gerceklesen paylasim sayisi
         "share_energy": 0.0,    # aktarilan toplam enerji

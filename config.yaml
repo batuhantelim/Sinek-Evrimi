@@ -72,6 +72,7 @@ agents:
     food_radius: 9.0      # yemek gradyani tarama yaricapi (hucre)
     hazard_radius: 12.0
     neighbor_radius: 8.0
+    predator_radius: 20.0   # avciyi kac hucre oteden gorebilir
 
   motors:
     max_speed: 0.85       # hucre / adim
@@ -207,6 +208,27 @@ rules:
     steal_ratio: 0.5        # kaybin ne kadari saldirana gecer
     cost: 2.0               # saldirganin sabit maliyeti (risk) — bedava degil
     min_attacker_energy: 10.0
+
+  predator:
+    # FAZ 4 — dogal avci: hareketli, ORTAK ve GRUPTAN BAGIMSIZ tehdit.
+    #
+    # Avci hedefini yalnizca MESAFEYE gore secer, soyisme bakmaz. Belirli bir
+    # soyu hedefleseydi grup dusmanligini elle kurmus olurduk.
+    #
+    # Adim basina TEK vurus + bekleme suresi => SEYRELTME (dilution):
+    # N kisilik kumede vurulan olma olasiligin 1/N. "Avci gelince gruplas"
+    # diye bir kural YOK; gruplasma karli hale gelir, secilim bulursa bulur.
+    # Kalibrasyon (Faz 3 rejiminde, 1500 adim): bu ayar olumlerin ~%23'unu
+    # avciya baglar ve koloni tavanda kalir. Daha zayifi secilim baskisi
+    # yaratmiyor (%1.6), daha gucluu koloniyi baskiliyor.
+    enabled: true
+    count: 20
+    speed: 0.45           # ajanlardan hizli: bireysel kacis tek basina yetmesin
+    vision: 25.0          # hedef arama menzili
+    strike_radius: 2.0
+    damage: 120.0         # cogu sinegi tek vurusta oldurur
+    cooldown: 20          # vurus sonrasi bekleme — seyreltmenin motoru
+    turn_rate: 0.20       # avci da ani yon degistiremez
 
   kinship:
     radius: 2.5           # hem akrabalik sensoru hem paylasim menzili

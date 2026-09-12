@@ -131,6 +131,20 @@ def render(sim) -> np.ndarray:
             hy = int(py + math.sin(a.heading) * scale * 0.9)
             _blit(img, hx, hy, max(1, dot // 2), (color[0] // 2 + 40, color[1] // 2 + 40, color[2] // 2 + 40))
 
+    # --- avcilar: ajanlardan belirgin sekilde buyuk ve kirmizi ---
+    pack = getattr(sim, "predators", None)
+    if pack is not None and getattr(pack, "enabled", False):
+        size = max(3, scale + 2)
+        for p in pack.predators:
+            px = int(p.x * scale) - size // 2
+            py = int(p.y * scale) + hud_h - size // 2
+            # bekleme suresindeki avci soluk: tehdit anlik degil
+            col = (255, 60, 60) if p.cooldown == 0 else (150, 60, 70)
+            _blit(img, px, py, size, col)
+            hx = int(px + math.cos(p.heading) * size)
+            hy = int(py + math.sin(p.heading) * size)
+            _blit(img, hx, hy, max(2, size // 2), col)
+
     if hud_h:
         _draw_hud(img, sim, w_px, hud_h)
     return img
@@ -165,6 +179,9 @@ def _draw_hud(img: np.ndarray, sim, w_px: int, hud_h: int) -> None:
         f"YEMEK {fill * 100:.0f}%   KUME {clus:+.2f}   SOY {row.get('lineage_count', 0)}"
         f"/{row.get('lineage_effective', 0.0):.1f}"
     )
+    pack = getattr(sim, "predators", None)
+    if pack is not None and getattr(pack, "enabled", False):
+        line1 += f"   AVCI {len(pack.predators)} OLDURME {pack.total_kills}"
     if getattr(sim, "_share_on", False):
         line2 = (
             f"PAYLAS IC {row.get('coop_in_group', 0.0) * 100:5.2f}% "

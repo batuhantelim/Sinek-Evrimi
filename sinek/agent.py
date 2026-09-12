@@ -40,6 +40,13 @@ SENSOR_NAMES: list[str] = [
                         #    donusumunun DOGRUSAL OLMADIGI yerde saglanabilir:
                         #    olmek uzere olan birine verilen enerji cok degerlidir.
                         #    Bu kanal olmadan beyin o ani HEDEFLEYEMEZ.
+    # --- Faz 4: dogal avci ---
+    "pred_fwd",         # 16 en yakin avcinin yonu, ileri bileseni  (-1..1)
+    "pred_left",        # 17 en yakin avcinin yonu, sol bileseni    (-1..1)
+    "pred_near",        # 18 en yakin avciya yakinlik               (0..1)
+                        #    Avci algilanamazsa ona karsi hicbir davranis
+                        #    evrimlesemez; kanal sart. Ne yapacagi (kacmak mi,
+                        #    kumelenmek mi) kodlanmaz.
 ]
 N_SENSORS = len(SENSOR_NAMES)
 
@@ -91,6 +98,8 @@ class Agent:
     damage_dealt: float = 0.0 # hedeflere verilen toplam zarar
     stolen: float = 0.0       # saldiriyla elde edilen enerji
     damage_taken: float = 0.0 # ustune gelen zarar
+    predator_hits: int = 0    # avcidan yenen vurus
+    predator_signal: tuple = (0.0, 0.0, 0.0)  # adim basi onbellek (yon x, y, yakinlik)
     nearest: "Agent | None" = None   # o adimdaki en yakin komsu (adim basi onbellek)
     last_motors: np.ndarray = field(
         default_factory=lambda: np.zeros(N_MOTORS, dtype=np.float32)
@@ -144,6 +153,13 @@ class Agent:
             s[S["neighbor_need"]] = min(
                 1.0, max(0.0, 1.0 - self.nearest.energy / phys.energy_max)
             )
+
+        # --- Faz 4: en yakin avci (adim basinda onbellege alindi) ---
+        px, py, pnear = self.predator_signal
+        if pnear > 0.0:
+            s[S["pred_fwd"]] = px * ch + py * sh
+            s[S["pred_left"]] = -px * sh + py * ch
+            s[S["pred_near"]] = pnear
 
         return s
 

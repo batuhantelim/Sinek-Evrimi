@@ -338,9 +338,14 @@ class TestAttackMechanics(unittest.TestCase):
         sim, a, b, _ = self._duel(3.0, rules__attack__damage=8.0)
         self.assertLessEqual(b.energy, 0.0)
         self.assertEqual(sim.stats_step["attack_kills"], 1)
-        sim.agents = [a, b]
+        self.assertEqual(b.death_cause, "killed")
+        # Kurban bir sonraki adimda yiyerek ya da bir paylasimla toparlanmasin:
+        # burada olcumuz olum MUHASEBESI, kurbanin ekolojik sansi degil.
+        sim.agents = [b]
+        sim.world.food[:] = 0.0
         sim.step()  # olum muhasebesi bir sonraki adimda islenir
         self.assertNotIn(b, sim.agents)
+        self.assertEqual(sim.stats_step["death_killed"], 1)
 
     def test_stratified_correction_applies_to_attack_too(self):
         stats = {f"opp_kin_{b}": 0 for b in range(5)}
