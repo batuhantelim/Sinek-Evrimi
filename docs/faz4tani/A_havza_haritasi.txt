@@ -1,0 +1,28 @@
+========================================================================================================
+HAVZA HARITASI — 12 seed  [A_taban]
+  toplama/paylasim: ajan-adim basina KISI BASI hiz (oran degil)
+========================================================================================================
+    seed   toplama  paylasim  isbirligi    kume  doluluk    pop  popdip  aclik%      r    soy      rejim
+     777    0.0285    5.8907     89.98%   0.993    0.654    700     700   10.2%  0.739   2.72      yumak
+     999    0.0289    4.5932     72.90%   0.996    0.659    700     700   11.0%  0.785   3.17      yumak
+   31337    0.0309    5.7294     91.95%   0.990    0.623    700     700    9.6%  0.783   2.53      yumak
+       7    0.0370    3.0276     59.44%   0.965    0.486    700     700   14.0%  0.712   7.43  toplayici
+    2024    0.0377    2.6335     54.05%   0.955    0.511    700     700   21.2%  0.654   5.37  toplayici
+      11    0.0379    2.4675     51.20%   0.976    0.474    700     700   21.2%  0.631   8.26  toplayici
+       2    0.0386    3.3013     66.37%   0.894    0.461    700     700   28.7%  0.696   5.70  toplayici
+       3    0.0389    3.6576     66.78%   0.981    0.448    700     700   13.1%  0.537   6.01  toplayici
+       1    0.0392    2.1780     49.18%   0.857    0.322    700     700   28.0%  0.533   3.85  toplayici
+      99    0.0398    2.0031     41.78%   0.918    0.418    700     700   30.7%  0.517   8.22  toplayici
+      42    0.0401    0.1421      4.44%   0.474    0.239    700     700   33.1%  0.286   9.53  toplayici
+     123    0.0440    2.2558     85.91%   0.452    0.310    700     700   17.5%  0.685   3.60  toplayici
+
+  --- esik VERIDEN turetildi (en buyuk bosluk) ---
+  esik (forage)      : 0.0339
+  en buyuk bosluk    : 0.0060  (aralikta %39'lik pay)
+  bosluk orani       : 1.54× (ikinci en buyuk bosluga gore)
+  bolunme            : 3 yumak / 9 toplayici
+  karar              : bimodal DEGIL — tek tepe + yayilim gibi
+
+  [yumak] n=3  toplama 0.0294±0.0013  paylasim 5.4044  isbirligi %84.9  kume 0.993  pop 700 (dip 700)  aclik %10  r 0.769  soy 2.8
+  [toplayici] n=9  toplama 0.0392±0.0021  paylasim 2.4074  isbirligi %53.2  kume 0.830  pop 700 (dip 700)  aclik %23  r 0.584  soy 6.4
+

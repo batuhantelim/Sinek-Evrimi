@@ -1,0 +1,40 @@
+# FAZ 4 TABAN — ölçülebilir başlangıç durumu.
+#
+# Rejim Faz 3 adım 2 / faz4_avcisiz.yaml ile BİREBİR AYNI. Hiçbir ödeme
+# parametresi değişmedi; değişen tek şey TOHUM POPÜLASYONU.
+#
+# Neden: tanı taraması (docs/faz4tani/) sistemin iki KARARLI duruma sahip
+# olduğunu gösterdi — "seyrek toplayıcı" ve "yoğun paylaşım yumağı". Ortak bir
+# başlangıçtan 12 seed'in 11'i yumağa kaçıyor ve orada in/out paylaşım
+# hücreleri %97'de doyup ayrımcılığı ölçülemez kılıyor. İki durum da kendi
+# kendini sürdürdüğü için çözüm parametre değil, DOĞRU DURUMDA BAŞLAMAK.
+#
+# Bu tohumla 5 seed'de: işbirliği %10.0–22.7 (yayılım 12.7 puan), dış-grup
+# fırsat payı %51, etkin soy 7.2, kişi başı toplama taban seviyesinde,
+# tükenme yok — koşumlardan önce ilan edilmiş beş ölçütün hepsi geçildi.
+#
+# TOHUM ZORUNLUDUR, yoksa bu dosya faz4_avcisiz.yaml'dan farksızdır:
+#   python run.py --config experiments/faz4_taban.yaml \
+#     --load-genomes docs/faz4tani/population_taban.npz --seed 42
+#
+# Bir müdahale (avcı, gruplar arası rekabet, melez soyisim) eklendiğinde
+# ölçüt YENİDEN denetlenmelidir; taban yalnızca müdahalesiz doğrulandı.
+run:
+  name: faz4_taban
+  steps: 12000
+agents:
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+rules:
+  predator:
+    enabled: false
+  share:
+    need_bonus: 3.0
+  attack:
+    enabled: true
+viz:
+  color_by: lineage
+  every: 50

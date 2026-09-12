@@ -247,6 +247,14 @@ class TestBasinMap(unittest.TestCase):
         ).to_dict()
         self.assertEqual(_mechanics(from_tool), _mechanics(from_file))
 
+    def test_new_base_changes_only_the_starting_population(self):
+        """Faz 4 tabaninin iddiasi: 'hicbir odeme parametresi degismedi, yalnizca
+        tohum populasyonu degisti'. Rejim avcisiz koldan ayrisirsa bu iddia coker
+        ve taban gizlice yeni bir deney olur."""
+        taban = load_config(os.path.join(ROOT, "experiments", "faz4_taban.yaml")).to_dict()
+        avcisiz = load_config(os.path.join(ROOT, "experiments", "faz4_avcisiz.yaml")).to_dict()
+        self.assertEqual(_mechanics(taban), _mechanics(avcisiz))
+
     def test_predator_is_off(self):
         cfg = load_config(
             overrides=seed_sweep.FIXED + seed_sweep.REGIME + [basin_map.PREDATOR_OFF]

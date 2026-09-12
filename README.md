@@ -50,6 +50,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 3 — eksen A | Dış-grup bolluğu düşmanlığı tetiklemiyor | ✅ |
 | 3 — eksen B | Kıtlık da saldırıyı artırmıyor; H1 ve H2 reddedildi | ✅ |
 | 4 — adım 1 | Doğal avcı (grup-kör): düşmanlık da sürü işbirliği de çıkmadı | ✅ |
+| 4 — tanı | Rejim çatalı teşhis edildi; ölçülebilir taban bulundu | ✅ |
 | 4 — adım 2 | Melez soyisim, soy-arası matris, gruplar arası rekabet | ⏳ |
 
-Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/)
+Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/)

@@ -1,0 +1,17 @@
+============================================================================================
+FAZLA ENERJI BEDAVA MI? — paylasimin VERICI ENERJI katmanina gore dagilimi
+  enerji tavani 160 | ureme esigi 130 | katman genisligi 32 | populasyon tavani 700
+  dogum/adim: tani_s777 1.45, tani_s42 1.26
+============================================================================================
+     katman (enerji)   ureme? |        tani_s777 |         tani_s42
+                0-32    hayir |    1.8% pay ( 32.8%) |   10.0% pay ( 10.2%)
+               32-64    hayir |    4.8% pay ( 86.1%) |   23.6% pay (  9.9%)
+               64-96    hayir |    8.5% pay ( 85.1%) |   21.1% pay (  5.2%)
+              96-128    hayir |   15.5% pay ( 90.0%) |   17.2% pay (  4.0%)
+             128-160    kismi |   69.4% pay ( 83.2%) |   28.2% pay (  1.6%)
+
+  sutunlar: paylasimlarin yuzde kaci o katmandan geldi (parantez: o katmandaki FIRSAT basina paylasma olasiligi)
+           tani_s777: paylasimlarin %69.4'i en ust katmandan (ureme esigini kapsar); yoksul katmanda paylasma olasiligi %86.1, en ust katmanda %83.2
+            tani_s42: paylasimlarin %28.2'i en ust katmandan (ureme esigini kapsar); yoksul katmanda paylasma olasiligi %9.9, en ust katmanda %1.6
+
+  YORUM: eger paylasim YALNIZCA en ust (fazla) katmandan geliyorsa 'bedava surplus' aciklamasi tutar. Yoksul katmanda da yuksek olasilikla paylasiliyorsa paylasim GERCEKTEN maliyetlidir ve aciklama baska yerde aranmalidir.

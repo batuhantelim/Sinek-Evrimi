@@ -27,6 +27,7 @@ python run.py --config experiments/<dosya>.yaml
 | `faz4_avci_kontrol.yaml` | Avcili kolun karistirma kontrolu |
 | `faz4_avcisiz.yaml` | Avcisiz taban kol (2x2'nin ucuncu hucresi) |
 | `faz4_avcisiz_kontrol.yaml` | Avcisiz karistirma kontrolu |
+| `faz4_taban.yaml` | **Faz 4 olculebilir taban** — rejim ayni, TOHUM farkli (zorunlu) |
 
 Tek seferlik degisiklikler icin dosya acmaya gerek yok:
 

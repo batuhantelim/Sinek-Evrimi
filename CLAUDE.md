@@ -37,6 +37,7 @@ davranış oradan **türer**.
 | **Faz 3 — eksen A** | Dış-grup bolluğu düşmanlığı tetiklemiyor; adım 2 daraltıldı | ✅ **tamam** |
 | **Faz 3 — eksen B** | Kıtlık saldırıyı hiç artırmadı; H2 de reddedildi | ✅ **tamam** |
 | **Faz 4 — adım 1** | Doğal avcı (grup-kör); düşmanlık da sürü işbirliği de çıkmadı | ✅ **tamam** |
+| **Faz 4 — tanı** | Rejim çatalı: gerçek ama havzalar eşit değil; ölçülebilir taban bulundu | ✅ **tamam** |
 | **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 4).
@@ -79,6 +80,8 @@ tools/parochial_report.py  Dört hücreli in/out matrisi + birlikte hareket
 tools/seed_sweep.py     Adım 2'yi çok seed'de tekrarlar (tekrarlanabilirlik tablosu)
 tools/env_sweep.py      Çevresel tarama (eksen A: dış-grup bolluğu, eksen B: kıtlık)
 tools/predator_sweep.py Faz 4 avcı 2×2 taraması + D/Ç sınıflandırması
+tools/basin_map.py      Rejim havzası haritalama (eşik veriden türetilir)
+tools/surplus_probe.py  Paylaşım verici enerji katmanına göre: fazlalık mı, maliyet mi?
 tests/                  unittest — determinizm + faz testleri + araç/yöntem testleri
 ```
 
@@ -395,6 +398,71 @@ yüksek sesle bayraklar: kontrol erken bittiyse ("OKUNMAZ") ve dış-grup payı
 
 ---
 
+## 3.7 Faz 4 tanı: rejim çatalı ve ölçülebilir taban
+
+Tam rapor: **[docs/faz4tani/tani_bistabilite.md](docs/faz4tani/tani_bistabilite.md)**
+
+### İki durum gerçekten de kararlı — ama havzalar eşit değil
+
+12 seed, yalnızca seed değişerek: işbirliği %4.4–%91.9, ama **11'i %42'nin
+üstünde**. Yoğun paylaşım durumu baskın çekim havzası, seyrek toplayıcı durum
+nadir. Buna karşılık 2×2 genom takası iki durumun da **kendi kendini
+sürdürdüğünü** gösteriyor (seed 42 + 777'nin genomları → %97.3; seed 777 +
+42'nin genomları → %17.3). Yani çatal gerçek, havzalar eşit değil.
+
+Havzayı **seed belirlemiyor, popülasyonun kendisi belirliyor**. Erken dinamik
+de belirlemiyor: 7. döneme (4000. adım) kadar erken işbirliği ile son çeyrek
+arasındaki korelasyon r ≤ +0.42; ayrışma 4000–8000 arasında oluyor.
+
+### Paylaşım toplamayı EZMİYOR
+
+Kişi başı toplama 12 seed'de yalnızca 1.5× aralıkta (VK %13) oynarken paylaşım
+41× oynuyor. Korelasyon −0.827 ama etki büyüklüğü yok. "Yumak" foraging'in
+yerine geçmiyor, üstüne biniyor.
+
+### Ara rejim yok: sistem ya ölü ya kaçak
+
+`need_bonus` ekseninde geçiş 1.0 ile 2.0 arasında:
+
+| `need_bonus` | işbirliği medyan | seed'ler arası yayılım |
+|---|---|---|
+| 0.0 | %1.3 | 1.3 puan |
+| 1.0 | %2.1 | **0.8 puan** |
+| 2.0 | %15.1 | **89.6 puan** ← kritik nokta |
+| 3.0 (taban) | %59.4 | 85.5 puan |
+
+Eşikte varyans patlıyor. `overhead` daha zayıf bir kaldıraç; karışma
+(`max_speed`) medyanı bandın içine çekiyor ama dış-grup fırsat payını %9.1'e
+düşürerek ölçülebilirliği bozuyor. **Bu üç kaldıraçta "her iki davranışın da
+yaşadığı" bir ayar yok.**
+
+### ⚠ Popülasyonu sınırlayan şey çevre değil, `agents.max_count`
+
+Popülasyon her koşumun **%99.4'ünde tavanda** (N=700), ~72. adımdan itibaren.
+Tavan 3000'e çıkarılınca koloni 3000'i de dolduruyor; yemek yenilenmesi 16.7×
+kısılınca popülasyon yine 700. `max_count` config'e "bellek/hız emniyeti" diye
+konmuştu; fiilen **Faz 3 ve Faz 4'ün her deneyinde taşıma kapasitesi o olmuş**.
+
+Sonucu: üreme bir slot kuyruğu (~1 doğum/adım, 700 aday), dolayısıyla enerji
+fitness'a ancak zayıf dönüşüyor. Bu yüzden **enerji biriminde ölçülen `b/c`
+seçilim ölçütü değildir**: `r·b/c` 12 koşumun hepsinde 1'in altında (0.37–0.91)
+olmasına rağmen işbirliği %92'ye çıkabiliyor. Eksen B'nin "kıtlık" koşulları da
+popülasyonu hiç değiştirmemişti — bireyleri fakirleştirdiler, koloniyi değil.
+
+### Taban: parametre değil, başlangıç durumu
+
+İki durum da kararlı olduğuna göre çözüm doğru durumda **başlamak**.
+`experiments/faz4_taban.yaml` + `docs/faz4tani/population_taban.npz`: rejim
+Faz 3 adım 2 ile birebir aynı (`test_new_base_changes_only_the_starting_population`),
+yalnızca tohum farklı. 5 seed'de işbirliği %10.0–22.7 (yayılım 12.7 puan),
+dış-grup fırsat payı %51, etkin soy 7.2, tükenme yok — koşumlardan önce ilan
+edilmiş beş ölçütün hepsi geçildi. İşbirliğinin **yukarı doğru yeri var**, yani
+bir müdahalenin etkisi tavanda kaybolmaz.
+
+Bir müdahale eklendiğinde ölçüt **yeniden** denetlenmelidir.
+
+---
+
 ## 4. Nasıl çalıştırılır
 
 ```bash
@@ -417,6 +485,15 @@ python run.py --config experiments/faz2_surekli.yaml              # sürekli evr
 python run.py --config experiments/faz2_kitlik.yaml               # kıtlık
 python run.py --config experiments/faz3b_saldiri.yaml             # Faz 3 adım 2
 python run.py --config experiments/faz4_avci.yaml                 # Faz 4 doğal avcı
+```
+
+Faz 4'ün **ölçülebilir tabanı** (tohum zorunlu, yoksa avcısız koldan farksız):
+
+```bash
+python run.py --config experiments/faz4_taban.yaml \
+  --load-genomes docs/faz4tani/population_taban.npz --seed 42
+python tools/basin_map.py --seeds 1 7 42 123 777 --out runs/havza.jsonl
+python tools/basin_map.py --summary runs/havza.jsonl
 ```
 
 Faz 4'ün 2×2'si (dört kol da Faz 2 tohumuyla, her biri kendi kontrolüyle):
@@ -508,6 +585,7 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `attack_kin_bias`, `attack_kin_bias_adj` | saldırıda akrabalık ayrımcılığı (ham / düzeltilmiş) |
 | `death_predator`, `predator_strikes`, `predator_kills` | avcı muhasebesi |
 | `predation_risk` | kişi başı avlanma baskısı (öldürme / ajan) |
+| `forage_per_capita`, `share_per_capita` | ajan-adım başına **mutlak** toplama / aktarım (oran değil) |
 | `gp_<parametre>` | her genom parametresinin popülasyon ortalaması — evrimin **yönü** |
 | `cooperation_rate` | Faz 3 için ayrılmış |
 
@@ -689,17 +767,45 @@ Tam tablo: **[docs/faz4/adim1_avci.md](docs/faz4/adim1_avci.md)**
 - **Fedakârlık ile düşmanlık avcı altında BAĞLANMADI.** Dönemler arası
   `coop_in × attack_out` r: avcılı −0.24, avcısız +0.01; işaret seed'den
   seed'e dönüyor ve karıştırma kontrolünde de benzer değerler çıkıyor.
-- **Koloni iki kararlı rejim arasında salınıyor**: "seyrek toplayıcı"
-  (işbirliği <%20, doluluk ~0.25) ve "yoğun paylaşım yumağı" (işbirliği >%50,
-  toplayıcılık düşük). Yumak rejimi avcısız kollarda ve bilgisiz kontrollerde
-  de çıkıyor; koşumlar arası büyüklük farkının çoğunu avcı değil bu **havza
-  seçimi** açıklıyor. 20 avcılı partide kontrolün tükenmesi bunun uç hâliydi.
+- **Koloni iki kararlı duruma sahip**: "seyrek toplayıcı" ve "yoğun paylaşım
+  yumağı". Yumak avcısız kollarda ve bilgisiz kontrollerde de çıkıyor;
+  koşumlar arası büyüklük farkının çoğunu avcı değil bu **havza seçimi**
+  açıklıyor. 20 avcılı partide kontrolün tükenmesi bunun uç hâliydi.
+  ⚠ **DÜZELTME (tanı taraması):** burada "iki kararlı rejim arasında
+  salınıyor" demiştim; 3 seed için doğru görünüyordu. 12 seed'de havzalar
+  **eşit değil** — ortak başlangıçtan 11/12 koşum yumağa gidiyor, seyrek durum
+  nadir ve adım 1'in seed 42'si tam o nadir koşumdu. Bkz. §3.7.
 - **Faz 3 adım 2'nin seed 42 "saldırı kör" bulgusu tekrarlanmadı**: sensör
   sözleşmesi 16 → 19'a çıkınca aynı seed'in avcısız kolu `atk_t = −10.43`
   veriyor. Eksen A'nın uyarısı bir kez daha doğrulandı.
 - Yan etkiler (avcılı vs avcısız, seed 42): kümelenme 0.474 → 0.989, etkin soy
   9.53 → 2.81, dış-grup payı %57.9 → %22.8, yemek doluluğu 0.239 → 0.883.
   Avcı yalnızca tehdit eklemiyor; bunlardan ikisi **ölçümün kendisini** bozuyor.
+
+### Faz 4 tanı — rejim çatalı (51 koşum: 12 seed harita + 8 koşul × 5 seed + takas)
+
+Tam tablo: **[docs/faz4tani/tani_bistabilite.md](docs/faz4tani/tani_bistabilite.md)**
+
+- **Çatal gerçek ama havzalar eşit değil.** Ortak başlangıçtan 12 seed'in 11'i
+  yoğun paylaşım durumuna gidiyor; seyrek toplayıcı durum nadir. Yine de genom
+  takası iki durumun da kendi kendini sürdürdüğünü gösteriyor.
+- **Havzayı popülasyon belirliyor, seed değil.** seed 42 + 777'nin genomları
+  → %97.3; seed 777 + 42'nin genomları → %17.3. Erken dinamik de öngörmüyor
+  (4000. adıma kadar r ≤ +0.42).
+- **"Paylaşım toplamayı eziyor" hipotezi reddedildi.** Paylaşım 41× oynarken
+  kişi başı toplama yalnızca 1.5× oynuyor.
+- **Ara rejim yok.** `need_bonus` 1.0 → 2.0 → 3.0 boyunca işbirliği
+  %2.1 → %15.1 → %59.4, yayılım 0.8 → 89.6 → 85.5 puan. Eşikte varyans
+  patlıyor; düşük yayılımlı tek ayarlar paylaşımın söndüğü ayarlar.
+- **⚠ Yapısal bulgu: popülasyonu `agents.max_count` sınırlıyor, çevre değil.**
+  Adımların %99.4'ü tavanda; tavan 3000'e çıkınca koloni 3000'i de dolduruyor,
+  yemek 16.7× kısılınca yine 700. Üreme bir slot kuyruğu olduğu için enerji
+  fitness'a zayıf dönüşüyor — `r·b/c` 12 koşumun hepsinde 1'in **altında**
+  (0.37–0.91) olmasına rağmen işbirliği %92'ye çıkabiliyor.
+- **Taban bulundu ve parametre değişikliği gerektirmiyor**:
+  `experiments/faz4_taban.yaml` + `docs/faz4tani/population_taban.npz`.
+  5 seed'de işbirliği %10.0–22.7 (yayılım 12.7 puan), dış-grup payı %51,
+  etkin soy 7.2 — önceden ilan edilmiş beş ölçütün hepsi geçildi.
 
 ### Kalibrasyon notları
 
@@ -734,10 +840,10 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
    tetikleyicinin yalnızca yarısıymış. Eksik olan **gruplar arası rekabet**:
    ortak tehdit kaynak paylaşmıyor, bir soyun kazancı diğerinin kaybı değil.
    Bunu eklemeden parochial düşmanlık beklenmemeli.
-2. **Rejim bistabilitesi** önce anlaşılmalı. Koloni "seyrek toplayıcı" ile
-   "yoğun paylaşım yumağı" arasında salınıyor ve bu salınım avcının etkisini
-   gömüyor. Hangi koşulun hangi havzaya ittiği süpürülmeden yeni bir mekanik
-   eklemek, ölçülemeyen bir şeyin üstüne ölçülemeyen bir şey koymaktır.
+2. ✅ **Rejim çatalı** teşhis edildi (§3.7). Ölçülebilir taban hazır:
+   `experiments/faz4_taban.yaml` + `docs/faz4tani/population_taban.npz`.
+   Adım 2'nin bütün kolları bu tohumla kurulmalı; müdahale eklenince Bölüm B
+   ölçütü **yeniden** denetlenmeli.
 3. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
    etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
    etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
@@ -746,8 +852,13 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
 4. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
    `(soy_i, soy_j)` matrisine genişletilecek. `stratified_kin_bias`
    `action` parametresiyle zaten genel; hücre başına da uygulanabilir.
-5. Faz 4 adım 1'in kazananlarıyla başlamak:
-   `python run.py --load-genomes docs/faz4/population.npz`
+5. **`agents.max_count` yapısal bir borç.** Popülasyonu çevre değil tavan
+   sınırlıyor (§3.7) ve bu, enerji biriminde ölçülen her fitness argümanını
+   (`bc_ratio`, Hamilton) zayıflatıyor. Çevrenin bağlayıcı olduğu bir ekoloji
+   kurmak Faz 5'in işi; o yapılana kadar `r·b/c` bir seçilim ölçütü gibi
+   okunmamalı.
+6. Adım 2 tohumu: `docs/faz4tani/population_taban.npz` (ölçülebilir taban).
+   Faz 4 adım 1'in avcılı kazananları ise `docs/faz4/population.npz`.
 
 ---
 
@@ -816,4 +927,17 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
   Faz 4'e ilerleyince Faz 1/2/3 deney dosyalarına ve `seed_sweep.REGIME`'e
   `rules.predator.enabled=false` eklendi; yoksa eski fazlar sessizce başka bir
   deneye dönüşürdü. Test bunu tutar (`TestPredatorArms`).
+- **ORAN yerine KİŞİ BAŞI MUTLAK hız kullanın.** `food_fill` bir stoktur ve
+  kapasiteye bağlıdır; "koloni topluyor mu yoksa enerjiyi yalnızca dolaştırıyor
+  mu" sorusu ancak `forage_per_capita` / `share_per_capita` ile sorulabilir.
+  20 avcılı kontrolün toplamayı gerçekten bıraktığı (0.0001) da böyle
+  doğrulandı.
+- **Sınıflandırma eşiğini veriden türetin.** `basin_map` eşiği sıralı
+  değerlerdeki en büyük boşluktan alır ve boşluk ikincisine yakınsa "bimodal
+  değil" der. Uydurma bir eşik, olmayan bir çatalı var gösterir.
+- **Popülasyon tavanda mı diye bakın.** `agents.max_count` bağlayıcıysa üreme
+  bir slot kuyruğudur ve enerji fitness'a zayıf dönüşür; enerji biriminde
+  ölçülen `b/c` o durumda seçilim ölçütü **değildir**.
+- **Varyans patlaması eşiğin imzasıdır.** Bir kaldıraçta seed'ler arası yayılım
+  tepe yapıyorsa oradasınız kritik noktadasınız; o ayarı taban seçmeyin.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.
