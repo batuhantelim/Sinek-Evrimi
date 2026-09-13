@@ -88,6 +88,8 @@ tools/surplus_probe.py  Paylaşım verici enerji katmanına göre: fazlalık mı
 tools/selection_probe.py  Enerji → üreme → seçilim zinciri sağlıklı mı (tamamlanmış yaşamlar)
 tools/hamilton_probe.py   Hamilton'un b ve c'sini YAVRU cinsinden ölçer (varsaymaz)
 tools/encounter_probe.py  Tekrarlı karşılaşma: EPİZOT mu, uzun bitişiklik mi?
+tools/partner_report.py   Faz 6 üç kol: önkoşul + asıl ölçüt + politika ölçütü ayrı
+tools/exclusion_probe.py  Dışlama: YAPISAL mı BİREYSEL mi; seçilmeyenlerin profili
 tests/                  unittest — determinizm + faz testleri + araç/yöntem testleri
 ```
 

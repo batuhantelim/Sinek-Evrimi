@@ -310,6 +310,13 @@ rules:
 
   kinship:
     radius: 2.5           # hem akrabalik sensoru hem paylasim menzili
+    # ⚠ FAZ 6 UYARISI: bu menzilde aday havuzu ortalama 1.35 kisidir, yani
+    # partner secimi ACIK olsa bile secilecek bir sey yoktur (olculdu: secim
+    # kolu secimsiz kolla ayni `state_hash`'i verdi). Faz 6 koşumlari bu yuzden
+    # `experiments/faz6_secim.yaml` icinde radius: 5.0 pinler. Varsayilan
+    # 2.5'te BIRAKILDI: Faz 1-5'in butun taban cizgileri bu menzilde olculdu,
+    # varsayilani oynatmak eski deney dosyalarini sessizce baska bir deneye
+    # cevirirdi.
     # KONTROL GRUPLARI — akrabalik yapisini bozarlar:
     #   none                    : normal kosum
     #   random_surname_at_birth : etiket birey icin sabit ama KALITSAL DEGIL

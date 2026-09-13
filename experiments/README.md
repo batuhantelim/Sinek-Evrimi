@@ -2,7 +2,7 @@
 
 Her dosya `config.yaml` uzerine bindirilir; sadece degistirdigi anahtarlari
 icerir. `config.yaml` her zaman **en guncel fazin** varsayilanini tasir
-(su an Faz 5), onceki fazlar buradan yeniden uretilir. Faz 1/2/3 dosyalari
+(su an Faz 6), onceki fazlar buradan yeniden uretilir. Faz 1/2/3 dosyalari
 `rules.predator.enabled: false` tasir: varsayilan ilerledi diye eski bir
 deney sessizce baska bir deneye donusmemeli.
 
@@ -30,6 +30,18 @@ python run.py --config experiments/<dosya>.yaml
 | `faz4_taban.yaml` | **Faz 4 olculebilir taban** — rejim ayni, TOHUM farkli (zorunlu) |
 | `faz45_ekoloji.yaml` | **Faz 4.5 TEMIZ EKOLOJI** — korunumlu paylasim + baglayici olmayan tavan |
 | `faz5_hafiza.yaml` | **Faz 5** — tanima + hafiza kanali (karsiliklilik olcumu) |
+| `faz6_secim.yaml` | **Faz 6** — partner secimi (aday havuzu + genomdan gelen politika) |
+
+Faz 6 dosyasi tek bir yerde daha Faz 5'ten ayrilir: `rules.kinship.radius: 5.0`.
+Varsayilan 2.5'te aday havuzu ortalama 1.35 kisidir, yani "secim" diye bir sey
+yoktur — secim kolu secimsiz kolla ayni `state_hash`'i verir. Menzil bir
+ONKOSUL geregi yukseltildi ve **uc kola da ayni** uygulanir
+(bkz. `docs/faz6/olcut.md` EK). Kontrol kollari:
+
+```bash
+python run.py --config experiments/faz6_secim.yaml --set rules.partner.enabled=false  # secimsiz
+python run.py --config experiments/faz6_secim.yaml --set rules.partner.control=random # rastgele
+```
 
 Tek seferlik degisiklikler icin dosya acmaya gerek yok:
 

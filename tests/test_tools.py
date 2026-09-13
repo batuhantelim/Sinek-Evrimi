@@ -403,6 +403,9 @@ class TestPartnerReport(unittest.TestCase):
         self.assertEqual(partner_report.MULTI_MIN, 0.50)
         self.assertEqual(partner_report.OUTGROUP_MIN, 0.10)
         self.assertEqual(partner_report.T_MIN, 2.0)
+        # Olcut 3'un ikinci yarisi: taban bandindan cikma sarti.
+        self.assertEqual(partner_report.BASELINE_HIGH, 0.024)
+        self.assertIn("%0.6\u20132.4", doc)
         self.assertIn("\u2265 2.0", doc)          # havuz esigi
         self.assertIn("%50", doc)                  # cok adayli karar esigi
         self.assertIn("%10", doc)                  # dis-grup olculebilirligi

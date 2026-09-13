@@ -40,6 +40,26 @@ MULTI_MIN = 0.50
 OUTGROUP_MIN = 0.10
 # Olcut 3: Welch t bu esigi gecmeli VE yukari yonlu olmali.
 T_MIN = 2.0
+# Olcut 3'un IKINCI yarisi: "Faz 4.5/4.6/5'te taban %0.6-2.4 bandindaydi;
+# 'kurdu' demek icin bu banttan CIKMASI gerekir." Kontrolden istatistiksel
+# ayrisma tek basina yetmez — 0.44% -> 0.89% ayrisir ama hala tabandir.
+BASELINE_HIGH = 0.024
+
+
+def energy_created(run: str) -> float:
+    """Korunum kontrolu ADIM bazli CSV'den okunur: `energy_created` bir donem
+    sutunu DEGIL, adim sayacidir. generations.csv'de arayan bir ilk surum
+    sessizce `nan` aliyordu — korunum ihlali boyle gozden kacar."""
+    path = os.path.join(run, "metrics.csv") if not run.endswith(".csv") else run
+    if not os.path.exists(path):
+        return float("nan")
+    total = 0.0
+    with open(path, newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            v = row.get("energy_created")
+            if v not in (None, ""):
+                total += float(v)
+    return total
 
 
 def read(path: str) -> list[dict] | None:
@@ -118,7 +138,7 @@ def report(prefix: str, seeds: list[int]) -> int:
             r = rows_per_seed[s][arm]
             if r is None:
                 continue
-            ec = mean(r, "energy_created")
+            ec = energy_created(os.path.join("runs", f"{prefix}_{arm}_s{s}"))
             flag = "" if abs(ec) < 1e-6 else "  ⚠GECERSIZ"
             og = outgroup_share(r)
             og_flag = "" if og >= OUTGROUP_MIN else " ⚠"
@@ -134,8 +154,15 @@ def report(prefix: str, seeds: list[int]) -> int:
     print("=" * 92)
     print("ASIL OLCUT (3) — isbirligi SECIMSIZ kontrolden yukari ayristi mi?")
     print("=" * 92)
-    print(f"  {'seed':>6s} {'secim%':>8s} {'secimsiz%':>10s} {'fark(puan)':>11s} {'Welch t':>9s} {'karar':>8s}")
+    print("  Ucuncu blok SART: artis 'secme yetenegi'nden mi (havuz varligi) yoksa")
+    print("  'akilli secim'den mi (evrimlesen politika) geliyor. Rastgele secim de")
+    print("  ayni artisi veriyorsa politika degil MEKANIK is yapiyor.")
+    print()
+    print(f"  {'seed':>6s} {'secim%':>8s} {'secimsiz%':>10s} {'fark(puan)':>11s} {'Welch t':>9s} {'karar':>14s}"
+          f" | {'rastgele%':>10s} {'t(secim-rast)':>14s}")
     passed = 0
+    sep_n = 0
+    mech = 0
     usable = 0
     for s in seeds:
         a, b = rows_per_seed[s]["secim"], rows_per_seed[s]["secimsiz"]
@@ -145,15 +172,35 @@ def report(prefix: str, seeds: list[int]) -> int:
         usable += 1
         sa, sb = tail(a, "cooperation_rate"), tail(b, "cooperation_rate")
         t = welch_t(sa, sb)
-        ok = t > T_MIN
+        sep = t > T_MIN                       # kontrolden ayristi mi
+        band = sa.mean() > BASELINE_HIGH      # taban bandindan cikti mi
+        ok = sep and band
         passed += ok
+        sep_n += sep
+        verdict = "GECTI" if ok else ("ayristi/taban" if sep else "hayir")
+        c = rows_per_seed[s]["rastgele"]
+        sc = tail(c, "cooperation_rate") if c is not None else np.zeros(0)
+        tr = welch_t(sa, sc) if sc.size else float("nan")
+        if sc.size and tr <= T_MIN:
+            mech += 1
         print(
             f"  {s:6d} {sa.mean()*100:8.2f} {sb.mean()*100:10.2f} "
-            f"{(sa.mean()-sb.mean())*100:+11.2f} {t:+9.2f} {'GECTI' if ok else 'hayir':>8s}"
+            f"{(sa.mean()-sb.mean())*100:+11.2f} {t:+9.2f} {verdict:>14s}"
+            f" | {sc.mean()*100 if sc.size else float('nan'):10.2f} {tr:+14.2f}"
         )
     need = math.ceil(usable * 2 / 3) if usable else 0
-    print(f"\n  ozet: {passed}/{usable} seed (olcut: >= 2/3, yani >= {need})"
+    print(f"\n  kontrolden AYRISMA : {sep_n}/{usable} seed (t > {T_MIN:g}, yukari)")
+    print(f"  TABAN BANDINDAN CIKMA: {passed}/{usable} seed "
+          f"(son ceyrek paylasim orani > {BASELINE_HIGH*100:.1f}%)")
+    print(f"  olcut: ikisi birlikte, >= 2/3 (yani >= {need})"
           f"  ->  {'PARTNER SECIMI ISBIRLIGINI KURDU' if usable and passed >= need else 'KURMADI'}")
+    print(f"  RASTGELE SECIM de ayni isi yapiyor: {mech}/{usable} seed "
+          "(secim, rastgeleden yukari AYRISMIYOR)")
+    if mech >= need:
+        print("  -> artisin kaynagi POLITIKA degil, HAVUZUN VARLIGI (mekanik).")
+    if sep_n >= need and passed < need:
+        print("  ⚠ Ayrisma var ama seviye taban bandinin ICINDE: 'kontrolden")
+        print("    yukari ayristi' ile 'isbirligini kurdu' AYNI SEY DEGIL.")
 
     print()
     print("=" * 92)
@@ -170,15 +217,44 @@ def report(prefix: str, seeds: list[int]) -> int:
         if a is None or b is None:
             print(f"  {s:6d}  (eksik kol)")
             continue
+        lin = mean(a, "lineage_effective")
         ka, kb = tail(a, "pick_kin_sel"), tail(b, "pick_kin_sel")
         la, lb = tail(a, "pick_ledger_sel"), tail(b, "pick_ledger_sel")
         tk, tl = welch_t(ka, kb), welch_t(la, lb)
-        pol += abs(tk) > T_MIN or abs(tl) > T_MIN
+        # OKUNMAZ kanal ozete girmez: etkin soy ~1 iken kinSel iki sifirin farki.
+        pol += bool(abs(tl) > T_MIN or (lin >= 2.0 and abs(tk) > T_MIN))
+        # Etkin soy ~1 ise HERKES akrabadir: kinSel yapisal olarak ~0 ve iki
+        # sifirin Welch t'si buyuk cikabilir. O hucre OKUNMAZ.
+        note = "" if lin >= 2.0 else f"   ⚠kinSel OKUNMAZ (etkin soy {lin:.2f})"
         print(
             f"  {s:6d} {ka.mean():+13.4f} {kb.mean():+12.4f} {tk:+7.2f} "
-            f"{la.mean():+13.4f} {lb.mean():+12.4f} {tl:+7.2f}"
+            f"{la.mean():+13.4f} {lb.mean():+12.4f} {tl:+7.2f}{note}"
         )
-    print(f"\n  ozet: {pol}/{len(seeds)} seed'de secicilik rastgeleden ayristi")
+    print(f"\n  ozet: {pol}/{len(seeds)} seed'de OKUNABILIR secicilik rastgeleden ayristi")
+
+    print()
+    print("=" * 92)
+    print("KIME — paylasim ve saldiri, defter isaretine kosullu (katmanli)")
+    print("=" * 92)
+    print("  ⚠ Secim SADECE paylasimi degil, SALDIRIYI da ayni partnere yoneltir")
+    print("  (ikisi ayni hedefi paylasir ve birbirini disar). Yani `pick_*_sel`")
+    print("  tek basina 'kime vermeyi sectim' demez; asagidaki iki sutun ayrimi")
+    print("  eylem bazinda gosterir.")
+    print()
+    print(f"  {'kol/seed':20s} {'paylasim%':>10s} {'recip_adj':>10s} {'saldiri%':>9s} "
+          f"{'retal_adj':>10s} {'defter+ firsat':>15s}")
+    for s in seeds:
+        for arm in ARMS:
+            r = rows_per_seed[s][arm]
+            if r is None:
+                continue
+            print(
+                f"  {arm+'/'+str(s):20s} {mean(r,'cooperation_rate')*100:10.2f} "
+                f"{mean(r,'recip_bias_adj'):+10.4f} {mean(r,'hostility_rate')*100:9.2f} "
+                f"{mean(r,'retal_bias_adj'):+10.4f} {mean(r,'opp_ledger_pos'):15.0f}"
+            )
+    print("\n  recip_adj/retal_adj kendi ESLESMIS kontroluna karsi okunur, sifira")
+    print("  karsi DEGIL (Faz 5 dersi: misilleme gorunusu tamamen konfoundluydu).")
 
     print()
     print("=" * 92)
