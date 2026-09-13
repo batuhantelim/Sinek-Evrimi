@@ -588,10 +588,16 @@ class Simulation:
             # Ham enerjide b <= c HER ZAMAN dogrudur; b > c ancak enerjinin
             # fitness'a donusumu DOGRUSAL OLMADIGI yerde olabilir: olmek uzere
             # olan bir aliciya verilen enerji cok daha degerlidir.
+            # IKI AYRI MUHASEBE, karistirilmamali:
+            #   share_benefit  = ENERJI birimi. Korunumlu modda <= maliyet
+            #                    (b/c <= 1 YAPISALDIR — Faz 3 adim 1.5).
+            #   share_benefit_fit = FITNESS birimi TAHMINI: alinan enerji x
+            #                    alicinin varsayilan donusum verimi. Bu bir
+            #                    VARSAYIMDIR; "r*b/c > 1" diye okunursa kendi
+            #                    varsayimimizi olcmus oluruz (Faz 4.6 notu).
             stats["share_cost"] += amount + overhead
-            # b FITNESS biriminde tahmin edilir: alinan enerji x alicinin
-            # donusum verimi. Enerji defterine dokunmaz.
-            stats["share_benefit"] += taken * (multiplier if need_mode != "energy" else 1.0)
+            stats["share_benefit"] += taken
+            stats["share_benefit_fit"] += taken * (multiplier if need_mode != "energy" else 1.0)
             if recipient_energy < rescue_level:
                 stats["share_rescue"] += 1
             stats["share_kin" if kin else "share_nonkin"] += 1
@@ -718,7 +724,8 @@ def _empty_stats() -> dict:
         "share_kin": 0,         # bunlarin kacinda paylasildi
         "share_nonkin": 0,
         "share_cost": 0.0,      # verenlerin toplam kaybi   (Hamilton c)
-        "share_benefit": 0.0,   # alicilarin toplam kazanci (Hamilton b)
+        "share_benefit": 0.0,   # alicilarin toplam ENERJI kazanci (Hamilton b)
+        "share_benefit_fit": 0.0,  # ayni sey FITNESS birimi TAHMINIYLE (varsayim!)
         "share_rescue": 0,      # olmek uzere olan bir aliciya yapilan paylasim
         "energy_created": 0.0,  # paylasimin yarattigi/yok ettigi net enerji (Faz 4.5)
         # --- Faz 3 adim 2: saldiri ---

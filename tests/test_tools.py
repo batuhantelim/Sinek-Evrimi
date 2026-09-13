@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 from sinek.config import load_config  # noqa: E402
 
 import basin_map  # noqa: E402
+import hamilton_probe  # noqa: E402
 import env_sweep  # noqa: E402
 import predator_sweep  # noqa: E402
 import seed_sweep  # noqa: E402
@@ -270,6 +271,31 @@ class TestBasinMap(unittest.TestCase):
             d["agents"]["max_count"] = 0
             d["rules"]["share"]["need_mode"] = "-"
         self.assertEqual(_mechanics(eko), _mechanics(taban))
+
+    def test_hamilton_probe_regime_matches_the_ecology_file(self):
+        """Sonda, Faz 4.5 ekolojisini olcmeli; rejim deney dosyasindan
+        ayrisirsa b/c ve r baska bir dunyanin sayilari olur."""
+        from_probe = load_config(
+            overrides=hamilton_probe.BASE + hamilton_probe.REGIME
+        ).to_dict()
+        from_file = load_config(
+            os.path.join(ROOT, "experiments", "faz45_ekoloji.yaml")
+        ).to_dict()
+        self.assertEqual(_mechanics(from_probe), _mechanics(from_file))
+
+    def test_hamilton_probe_keeps_conservation_on(self):
+        cfg = load_config(overrides=hamilton_probe.BASE + hamilton_probe.REGIME)
+        self.assertEqual(cfg.rules.share.need_mode, "fitness")
+
+    def test_ols_recovers_known_slopes(self):
+        rng = np.random.default_rng(0)
+        x1 = rng.normal(size=500)
+        x2 = rng.normal(size=500)
+        y = 2.0 * x1 - 3.0 * x2 + 1.0 + rng.normal(scale=0.01, size=500)
+        beta, tvals = hamilton_probe.ols(y, np.column_stack([x1, x2]))
+        self.assertAlmostEqual(beta[0], 2.0, places=2)
+        self.assertAlmostEqual(beta[1], -3.0, places=2)
+        self.assertGreater(abs(tvals[0]), 10.0)
 
     def test_predator_is_off(self):
         cfg = load_config(

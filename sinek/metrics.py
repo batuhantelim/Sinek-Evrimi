@@ -53,7 +53,8 @@ BASE_COLUMNS = [
     "kin_expected",       # iyi karismis dunyada beklenen akraba-komsu orani
     "kin_observed",       # gozlenen akraba-komsu orani
     "kin_assortment",     # (gozlenen-beklenen)/(1-beklenen)  ~ Hamilton'un r'si
-    "bc_ratio",           # gerceklesen b/c (ham enerjide yapisal olarak <= 1)
+    "bc_ratio",           # ENERJI birimi b/c — korunumlu modda yapisal olarak <= 1
+    "bc_ratio_fit",       # FITNESS birimi TAHMINI (need_bonus carpaniyla) — varsayim
     "rescue_share",       # paylasimlarin kaci olmek uzere olan birine gitti
     # --- Faz 3 adim 2: saldiri (dort hucreli matrisin ikinci satiri) ---
     "attack_events",
@@ -71,6 +72,7 @@ BASE_COLUMNS = [
     "repro_blocked",      # tavan yuzunden yanan ureme hakki (Faz 4.5)
     "at_cap",             # populasyon max_count'a degdi mi (0/1)
     "genetic_r",          # aktor-komsu GENOM benzerligi (Hamilton r, Faz 4.6)
+    "genetic_r_pairs",    # kac cift uzerinden hesaplandi (kucukse gurultu)
     "energy_created",     # paylasimin yarattigi net enerji — korunumlu modda 0
 ]
 
@@ -449,7 +451,14 @@ def social_rates(stats: dict) -> dict[str, float]:
         "kin_bias_adj": round(stratified_kin_bias(stats), 5),
         "opp_kin": int(opp_kin),
         "opp_nonkin": int(opp_non),
+        # ENERJI birimi: korunumlu modda yapisal olarak <= 1.
         "bc_ratio": round(_ratio(stats.get("share_benefit", 0.0), stats.get("share_cost", 0.0)), 5),
+        # FITNESS birimi TAHMINI (need_bonus carpaniyla). Bu bir VARSAYIMDIR;
+        # "r*b/c > 1" diye okumak kendi varsayimini olcmek olur (Faz 4.6).
+        # Gercek fitness b ve c'si tools/selection_probe.py ile OLCULUR.
+        "bc_ratio_fit": round(
+            _ratio(stats.get("share_benefit_fit", 0.0), stats.get("share_cost", 0.0)), 5
+        ),
         "rescue_share": round(
             _ratio(stats.get("share_rescue", 0), stats.get("share_events", 0)), 5
         ),
