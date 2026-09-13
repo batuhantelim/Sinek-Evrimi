@@ -70,6 +70,8 @@ BASE_COLUMNS = [
     "predation_risk",     # oldurme / ajan  (kisi basi avlanma baskisi)
     "repro_blocked",      # tavan yuzunden yanan ureme hakki (Faz 4.5)
     "at_cap",             # populasyon max_count'a degdi mi (0/1)
+    "genetic_r",          # aktor-komsu GENOM benzerligi (Hamilton r, Faz 4.6)
+    "energy_created",     # paylasimin yarattigi net enerji — korunumlu modda 0
 ]
 
 
@@ -175,9 +177,11 @@ class Metrics:
             "predation_risk": _r(sim.stats_step.get("predator_kills", 0) / max(1, n), 6),
             "repro_blocked": sim.stats_step.get("repro_blocked", 0),
             "at_cap": int(n >= int(sim.cfg.agents.max_count)),
+            "energy_created": _r(sim.stats_step.get("energy_created", 0.0), 4),
         }
         lin = lineage_stats(agents)
         row.update(lin)
+        row.update(genetic_relatedness(agents))
         row.update(social_rates(sim.stats_step))
         row.update(
             kin_assortment(
@@ -348,6 +352,47 @@ def lineage_stats(agents) -> dict[str, float]:
         # Iyi karismis (uzamsal yapisiz) bir dunyada iki rastgele bireyin ayni
         # soydan olma olasiligi. Assortment'in taban cizgisi.
         "kin_expected": round(float((p * p).sum()), 5),
+    }
+
+
+def genetic_relatedness(agents) -> dict[str, float]:
+    """GERCEKLESEN akrabalik r'si: aktor ile EN YAKIN KOMSUSU arasindaki
+    genom benzerligi, Hamilton'un regresyon tanimiyla.
+
+        r = Sum_k Cov(x_k^aktor, x_k^alici) / Sum_k Var(x_k^aktor)
+
+    k genom AGIRLIK boyutlari uzerinde gezer, kovaryans ciftler arasinda
+    alinir. Rastgele eslesmede 0, klonlarda 1.
+
+    NEDEN SOYISIM YETMEZ: `kin_assortment` etiket esitligini olcer, genetik
+    ozdesligi degil. Ayni soyisim mutasyonla ayrisir; farkli soyisimler
+    (split_rate) ayrilma aninda genetik olarak AYNIDIR. Hamilton esitsizligi
+    etiketle degil genomla calisir, dolayisiyla r kolunu buradan okumak
+    gerekir.
+
+    Not: `agents[i].nearest` son adimin anlik degeridir — soy istatistikleri
+    gibi bu da donem sonundaki kesittir.
+    """
+    pairs = [
+        (a, a.nearest)
+        for a in agents
+        if getattr(a, "nearest", None) is not None and a.nearest.alive
+    ]
+    if len(pairs) < 20:
+        return {"genetic_r": 0.0, "genetic_r_pairs": 0}
+    A = np.array([p[0].genome.weights for p in pairs], dtype=np.float64)
+    B = np.array([p[1].genome.weights for p in pairs], dtype=np.float64)
+    if A.ndim != 2 or A.shape[1] == 0:
+        return {"genetic_r": 0.0, "genetic_r_pairs": 0}
+    # Ortak (havuz) ortalamasiyla merkezle: aktor ve alici ayni populasyondan.
+    mu = 0.5 * (A.mean(axis=0) + B.mean(axis=0))
+    Ac, Bc = A - mu, B - mu
+    var = float((Ac * Ac).sum())
+    if var < 1e-12:
+        return {"genetic_r": 0.0, "genetic_r_pairs": len(pairs)}
+    return {
+        "genetic_r": round(float((Ac * Bc).sum()) / var, 5),
+        "genetic_r_pairs": len(pairs),
     }
 
 
