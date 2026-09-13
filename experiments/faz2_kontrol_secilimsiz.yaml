@@ -19,6 +19,8 @@ evolution:
     energy: 0.0
     distance: 0.0
 rules:
+  memory:
+    enabled: false        # Faz 5 mekanigi; bu deney hafizasiz kuruldu
   predator:
     enabled: false        # Faz 4 mekanigi; bu deney avcisiz kurulmustu
   attack:

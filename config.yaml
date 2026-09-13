@@ -220,6 +220,28 @@ rules:
     cost: 2.0               # saldirganin sabit maliyeti (risk) — bedava degil
     min_attacker_energy: 10.0
 
+  memory:
+    # FAZ 5 — TANIMA + HAFIZA: karsiliklilik icin gereken iki onkosul.
+    #
+    # Ajan artik en yakin komsusunun KIMLIGINI ayirt edebilir ve onunla
+    # gecmisini okuyabilir (`partner_known`, `partner_ledger` sensorleri).
+    # Defteri ALICI tutar: birinden enerji aldiysa +, biri saldirdiysa -.
+    #
+    # "Yardim edene yardim et" diye bir KURAL YOKTUR. Yalnizca bilgi kanali
+    # verilir; karsilikli strateji evrimlesirse evrimlesir, evrimlesmezse
+    # bu bir sonuctur (bkz. docs/faz5/).
+    enabled: true
+    capacity: 16          # ajan basina kac partner hatirlanir (dolunca en
+                          # zayif kayit atilir — deterministik)
+    scale: 8.0            # sensor normalizasyonu: tanh(defter / scale)
+    decay: 0.0            # adim basina unutma orani (0 = omur boyu hatirlar)
+    # KONTROL:
+    #   none             : normal kosum
+    #   shuffle_identity : tanima kimlikleri her adim karistirilir -> defter
+    #                      YANLIS bireyi gosterir. Gecmis anlamsizsa
+    #                      karsiliklilik cokmelidir.
+    control: none
+
   predator:
     # FAZ 4 — dogal avci: hareketli, ORTAK ve GRUPTAN BAGIMSIZ tehdit.
     #

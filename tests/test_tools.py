@@ -297,6 +297,16 @@ class TestBasinMap(unittest.TestCase):
         self.assertAlmostEqual(beta[1], -3.0, places=2)
         self.assertGreater(abs(tvals[0]), 10.0)
 
+    def test_phase5_memory_only_adds_the_channel(self):
+        """Faz 5'in iddiasi: 'ekoloji aynen duruyor, yalnizca tanima+hafiza
+        kanali acildi'. Rejim baska bir yerden ayrisirsa bu iddia coker."""
+        haf = load_config(os.path.join(ROOT, "experiments", "faz5_hafiza.yaml")).to_dict()
+        eko = load_config(os.path.join(ROOT, "experiments", "faz45_ekoloji.yaml")).to_dict()
+        self.assertTrue(haf["rules"]["memory"]["enabled"])
+        self.assertFalse(eko["rules"]["memory"]["enabled"])
+        haf["rules"]["memory"]["enabled"] = False
+        self.assertEqual(_mechanics(haf), _mechanics(eko))
+
     def test_predator_is_off(self):
         cfg = load_config(
             overrides=seed_sweep.FIXED + seed_sweep.REGIME + [basin_map.PREDATOR_OFF]

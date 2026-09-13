@@ -42,6 +42,9 @@ REGIME = [
     # Faz 4 avcisi bu rejimin parcasi DEGIL: config.yaml varsayilani ilerledi
     # diye adim 2 taramasi sessizce baska bir deney olmasin.
     "rules.predator.enabled=false",
+    # Faz 5 hafizasi bu rejimin parcasi DEGIL: varsayilan ilerledi diye
+    # eski tarama sessizce baska bir deney olmasin.
+    "rules.memory.enabled=false",
 ]
 FIXED = ["viz.mode=none", "metrics.enabled=false"]
 SEED_POP = "docs/faz2/population.npz"

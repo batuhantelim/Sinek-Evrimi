@@ -18,6 +18,8 @@ agents:
   reproduction:
     spawn_radius: 0.3
 rules:
+  memory:
+    enabled: false        # Faz 5 mekanigi; bu deney hafizasiz kuruldu
   predator:
     enabled: false        # Faz 4 mekanigi; bu deney avcisiz kurulmustu
   share:

@@ -47,6 +47,13 @@ SENSOR_NAMES: list[str] = [
                         #    Avci algilanamazsa ona karsi hicbir davranis
                         #    evrimlesemez; kanal sart. Ne yapacagi (kacmak mi,
                         #    kumelenmek mi) kodlanmaz.
+    # --- Faz 5: tanima + hafiza (karsiliklilik onkosullari 2 ve 3) ---
+    "partner_known",    # 19 bu BIREYLE daha once etkilesim oldu mu (0/1)
+    "partner_ledger",   # 20 onunla gecmisin net isareti (-1 .. +1):
+                        #    + = bana verdi, - = bana saldirdi
+                        #    BU BIR BILGI KANALIDIR, DAVRANIS KURALI DEGIL.
+                        #    "Yardim edene yardim et" diye bir sey kodlanmaz;
+                        #    karsilikli strateji evrimlesirse evrimlesir.
 ]
 N_SENSORS = len(SENSOR_NAMES)
 
@@ -101,6 +108,15 @@ class Agent:
     predator_hits: int = 0    # avcidan yenen vurus
     predator_signal: tuple = (0.0, 0.0, 0.0)  # adim basi onbellek (yon x, y, yakinlik)
     nearest: "Agent | None" = None   # o adimdaki en yakin komsu (adim basi onbellek)
+    #: Faz 5 TANIMA kimligi. Normalde `id` ile aynidir; `shuffle_identity`
+    #: kontrolunde her adim yasayanlar arasinda permute edilir, boylece defter
+    #: YANLIS bireyi gosterir (gecmis anlamsizlasir). `id` dokunulmaz kalir —
+    #: ajan sirasi ve determinizm ona bagli.
+    mem_id: int = -1
+    #: Faz 5 DEFTERI — partner kimligi -> gecmis etkilesimlerin net isareti.
+    #: ALICI kaydeder: birinden enerji aldiysa +, biri saldirdiysa -.
+    #: Kapasite sinirlidir; dolunca en zayif (|deger| en kucuk) kayit atilir.
+    ledger: dict = field(default_factory=dict)
     last_motors: np.ndarray = field(
         default_factory=lambda: np.zeros(N_MOTORS, dtype=np.float32)
     )
@@ -153,6 +169,14 @@ class Agent:
             s[S["neighbor_need"]] = min(
                 1.0, max(0.0, 1.0 - self.nearest.energy / phys.energy_max)
             )
+
+            # --- Faz 5: BU BIREYLE gecmis (defter) ---
+            # Defter bos ya da hafiza kapaliysa iki kanal da 0 kalir.
+            if phys.memory_enabled:
+                bal = self.ledger.get(self.nearest.mem_id)
+                if bal is not None:
+                    s[S["partner_known"]] = 1.0
+                    s[S["partner_ledger"]] = math.tanh(bal / phys.memory_scale)
 
         # --- Faz 4: en yakin avci (adim basinda onbellege alindi) ---
         px, py, pnear = self.predator_signal

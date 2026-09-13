@@ -1,0 +1,39 @@
+# FAZ 5 — TANIMA + HAFIZA: karşılıklılığın önkoşulları.
+#
+# Rejim Faz 4.5/4.6 ekolojisiyle BİREBİR aynı (korunumlu paylaşım, çevre-sınırlı
+# popülasyon). Tek fark `rules.memory.enabled: true`:
+#
+#   partner_known  — bu BİREYLE daha önce etkileşim oldu mu
+#   partner_ledger — onunla geçmişin net işareti (+ bana verdi, − saldırdı)
+#
+# "Yardım edene yardım et" diye bir KURAL YOKTUR. Yalnızca bilgi kanalı
+# verilir; karşılıklı strateji evrimleşirse evrimleşir.
+#
+# Önkoşul 1 (tekrarlı karşılaşma) bu ekolojide ÖLÇÜLDÜ: ajanların %50.6'sı aynı
+# bireyle ≥3 ayrı buluşma yaşıyor, dönüş aralığı medyan 16 adım (ömür 900).
+#
+#   python run.py --config experiments/faz5_hafiza.yaml \
+#     --load-genomes docs/faz45/population_ekoloji.npz --seed 42
+run:
+  name: faz5_hafiza
+  steps: 12000
+agents:
+  max_count: 5000
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+rules:
+  memory:
+    enabled: true
+  predator:
+    enabled: false
+  share:
+    need_bonus: 3.0
+    need_mode: fitness
+  attack:
+    enabled: true
+viz:
+  color_by: lineage
+  every: 50

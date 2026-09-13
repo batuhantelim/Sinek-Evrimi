@@ -11,6 +11,8 @@
 run:
   name: faz3_kontrol_akrabalik
 rules:
+  memory:
+    enabled: false        # Faz 5 mekanigi; bu deney hafizasiz kuruldu
   attack:
     enabled: false        # bu deney saldirisiz kurulmustu
   predator:

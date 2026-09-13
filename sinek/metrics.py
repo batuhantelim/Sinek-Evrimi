@@ -53,6 +53,12 @@ BASE_COLUMNS = [
     "kin_expected",       # iyi karismis dunyada beklenen akraba-komsu orani
     "kin_observed",       # gozlenen akraba-komsu orani
     "kin_assortment",     # (gozlenen-beklenen)/(1-beklenen)  ~ Hamilton'un r'si
+    "recip_bias",         # ham P(paylas|defter+) - P(paylas|defter<=0) — KONFOUNDLU
+    "recip_bias_adj",     # enerji katmanli karsiliklilik (guvenilen olcu, Faz 5)
+    "retal_bias_adj",     # enerji katmanli MISILLEME (bana saldirana saldirdim mi)
+    "opp_ledger_pos",     # defteri pozitif olan firsat sayisi (kucukse gurultu)
+    "opp_ledger_neg",
+    "ledger_pos_share",   # firsatlarin kaci defteri pozitif partnerle
     "bc_ratio",           # ENERJI birimi b/c — korunumlu modda yapisal olarak <= 1
     "bc_ratio_fit",       # FITNESS birimi TAHMINI (need_bonus carpaniyla) — varsayim
     "rescue_share",       # paylasimlarin kaci olmek uzere olan birine gitti
@@ -451,6 +457,33 @@ def social_rates(stats: dict) -> dict[str, float]:
         "kin_bias_adj": round(stratified_kin_bias(stats), 5),
         "opp_kin": int(opp_kin),
         "opp_nonkin": int(opp_non),
+        # --- Faz 5: KARSILIKLILIK (defter isaretine kosullu) ---
+        # "Bana veren birine ben de verir miyim?" ve misilleme karsiligi.
+        # Ham fark KONFOUNDLUDUR: defteri pozitif olan ajan enerji ALMISTIR,
+        # yani zengindir ve zaten daha cok paylasir. `_adj` enerji katmanli.
+        "recip_bias": round(
+            _ratio(
+                sum(stats.get(f"rcp_pos_{b}", 0) for b in range(5)),
+                sum(stats.get(f"oppr_pos_{b}", 0) for b in range(5)),
+            )
+            - _ratio(
+                sum(stats.get(f"rcp_non_{b}", 0) for b in range(5)),
+                sum(stats.get(f"oppr_non_{b}", 0) for b in range(5)),
+            ),
+            5,
+        ),
+        "recip_bias_adj": round(
+            stratified_kin_bias(stats, action="rcp", group="pos", opp="oppr"), 5
+        ),
+        "retal_bias_adj": round(
+            stratified_kin_bias(stats, action="rtl", group="neg", opp="oppg"), 5
+        ),
+        "opp_ledger_pos": int(stats.get("oppr_pos", 0)),
+        "opp_ledger_neg": int(stats.get("oppg_neg", 0)),
+        "ledger_pos_share": round(
+            _ratio(stats.get("oppr_pos", 0),
+                   stats.get("oppr_pos", 0) + stats.get("oppr_nonpos", 0)), 5
+        ),
         # ENERJI birimi: korunumlu modda yapisal olarak <= 1.
         "bc_ratio": round(_ratio(stats.get("share_benefit", 0.0), stats.get("share_cost", 0.0)), 5),
         # FITNESS birimi TAHMINI (need_bonus carpaniyla). Bu bir VARSAYIMDIR;
@@ -479,7 +512,9 @@ def _ratio(num, den) -> float:
     return float(num) / den if den > 1e-12 else 0.0
 
 
-def stratified_kin_bias(stats: dict, action: str = "shr", buckets: int = 5) -> float:
+def stratified_kin_bias(
+    stats: dict, action: str = "shr", buckets: int = 5, group: str = "kin", opp: str = "opp"
+) -> float:
     """Verici enerjisine gore katmanlanmis akrabalik ayrimciligi.
 
     NEDEN GEREKLI: akrabalar uzamsal olarak kumelenir, kumeler zengin yemek
@@ -496,16 +531,22 @@ def stratified_kin_bias(stats: dict, action: str = "shr", buckets: int = 5) -> f
 
     `action`: "shr" (paylasim) ya da "atk" (saldiri). Ayni konfound saldiri
     icin de gecerlidir, bu yuzden ayni duzeltme iki eyleme de uygulanir.
+
+    `group`/`opp`: hangi ikili ayrimin katmanlanacagi. Varsayilan akrabalik
+    ("kin" vs "non", firsatlar `opp_*`). Faz 5 karsiliklilik icin
+    group="pos", opp="oppr" ile cagrilir: defteri POZITIF olan partner vs
+    digerleri. Konfound ayni: defteri pozitif olan ajan ENERJI ALMISTIR,
+    yani zengindir ve zaten daha cok paylasir.
     """
     num = den = 0.0
     for b in range(buckets):
-        ok = float(stats.get(f"opp_kin_{b}", 0))
-        on = float(stats.get(f"opp_non_{b}", 0))
+        ok = float(stats.get(f"{opp}_{group}_{b}", 0))
+        on = float(stats.get(f"{opp}_non_{b}", 0))
         if ok <= 0 or on <= 0:
             continue
         w = ok * on / (ok + on)
         num += w * (
-            stats.get(f"{action}_kin_{b}", 0) / ok - stats.get(f"{action}_non_{b}", 0) / on
+            stats.get(f"{action}_{group}_{b}", 0) / ok - stats.get(f"{action}_non_{b}", 0) / on
         )
         den += w
     return num / den if den else 0.0

@@ -109,6 +109,13 @@ class Simulation:
         self.split_rate = float(cfg.get("rules.kinship.split_rate", 0.0))
         if self.kin_control not in ("none", "shuffle_surnames", "random_surname_at_birth", "scatter_offspring"):
             raise ValueError(f"bilinmeyen rules.kinship.control={self.kin_control!r}")
+        # --- Faz 5: tanima + hafiza ---
+        self.memory_on = bool(cfg.get("rules.memory.enabled", False))
+        self.memory_capacity = max(1, int(cfg.get("rules.memory.capacity", 16)))
+        self.memory_decay = float(cfg.get("rules.memory.decay", 0.0))
+        self.memory_control = str(cfg.get("rules.memory.control", "none"))
+        if self.memory_control not in ("none", "shuffle_identity"):
+            raise ValueError(f"bilinmeyen rules.memory.control={self.memory_control!r}")
 
         self.founder = founder_genome(cfg, self.rng)
         n0 = int(cfg.agents.initial_count)
@@ -170,6 +177,7 @@ class Simulation:
             lifespan=max(1.0, lifespan),
             birth_step=self.step_index,
         )
+        agent.mem_id = agent.id          # Faz 5: tanima kimligi (kontrol permute eder)
         self._next_id += 1
         return agent
 
@@ -198,6 +206,8 @@ class Simulation:
             self.hash.build(self.agents)
             if self.kin_control == "shuffle_surnames":
                 self._shuffle_surnames()
+            if self.memory_control == "shuffle_identity":
+                self._shuffle_identities()
             for a in self.agents:
                 a.nearest = self.hash.nearest(a, self.kin_radius, self.world)
 
@@ -521,6 +531,17 @@ class Simulation:
             bucket = min(ENERGY_BUCKETS - 1, int(a.energy / e_max * ENERGY_BUCKETS))
             stats[f"{'opp_kin' if kin else 'opp_non'}_{bucket}"] += 1
 
+            # Faz 5: ayni firsat, DEFTERE gore de siniflanir. "Bu birey bana
+            # daha once verdi mi?" Ayni enerji konfoundu burada da var —
+            # defteri pozitif olan ajan ENERJI ALMISTIR, yani zengindir ve
+            # zaten daha cok paylasir — o yuzden katman ayni sekilde tutulur.
+            owes = self.memory_on and a.ledger.get(other.mem_id, 0.0) > 0.0
+            grudge = self.memory_on and a.ledger.get(other.mem_id, 0.0) < 0.0
+            stats["oppr_pos" if owes else "oppr_nonpos"] += 1
+            stats[f"{'oppr_pos' if owes else 'oppr_non'}_{bucket}"] += 1
+            stats["oppg_neg" if grudge else "oppg_nonneg"] += 1
+            stats[f"{'oppg_neg' if grudge else 'oppg_non'}_{bucket}"] += 1
+
             share_urge = float(a.last_motors[M["share"]]) if self._share_on else 0.0
             atk_urge = float(a.last_motors[M["attack"]]) if self._attack_on else 0.0
             # Iki eylem birbirini disliyor: esigini daha cok asan kazanir.
@@ -528,7 +549,8 @@ class Simulation:
             atk_margin = atk_urge - atk_threshold
             if atk_margin > share_margin and atk_margin >= 0.0:
                 self._do_attack(
-                    a, other, kin, bucket, atk_urge, atk_damage, atk_steal, atk_cost, atk_floor
+                    a, other, kin, bucket, atk_urge, atk_damage, atk_steal, atk_cost,
+                    atk_floor, grudge
                 )
                 continue
             if share_margin < 0.0:
@@ -576,6 +598,8 @@ class Simulation:
             if taken > 0.0:
                 other.energy += taken
                 other.received += taken
+                # Faz 5: ALICI defterine yazar — "a bana verdi".
+                self._remember(other, a, taken)
             # Yaratilan/yok edilen enerji ACIKCA sayilir: korunumlu modda 0
             # olmalidir (`test_sharing_conserves_energy` bunu bekler).
             stats["energy_created"] += taken - min(amount, headroom)
@@ -602,9 +626,12 @@ class Simulation:
                 stats["share_rescue"] += 1
             stats["share_kin" if kin else "share_nonkin"] += 1
             stats[f"{'shr_kin' if kin else 'shr_non'}_{bucket}"] += 1
+            # Faz 5 karsiliklilik sayaci
+            stats[f"{'rcp_pos' if owes else 'rcp_non'}_{bucket}"] += 1
             self.share_events.append((a.x, a.y, other.x, other.y, kin))
 
-    def _do_attack(self, a, other, kin, bucket, urge, damage, steal, cost, floor) -> None:
+    def _do_attack(self, a, other, kin, bucket, urge, damage, steal, cost, floor,
+                   grudge: bool = False) -> None:
         """Saldiri: hedeften enerji alir, hedefe zarar verir, saldirgana MALIYET.
 
         SALDIRI DA ODULLENDIRILMEZ. `evolution.fitness` icinde saldiri terimi
@@ -623,6 +650,8 @@ class Simulation:
         if inflicted > 0.0:
             other.energy -= inflicted
             other.damage_taken += inflicted
+            # Faz 5: SALDIRIYA UGRAYAN defterine yazar — "a bana saldirdi".
+            self._remember(other, a, -inflicted)
             gained = inflicted * steal
             a.energy = min(self.physics.energy_max, a.energy + gained)
             a.stolen += gained
@@ -633,6 +662,8 @@ class Simulation:
         stats["attack_damage"] += inflicted
         stats["attack_kin" if kin else "attack_nonkin"] += 1
         stats[f"{'atk_kin' if kin else 'atk_non'}_{bucket}"] += 1
+        # Faz 5: MISILLEME sayaci — "bana saldirana saldirdim mi?"
+        stats[f"{'rtl_neg' if grudge else 'rtl_non'}_{bucket}"] += 1
         if other.energy <= 0.0:
             other.death_cause = "killed"
             stats["attack_kills"] += 1
@@ -650,6 +681,37 @@ class Simulation:
         order = self.rng.permutation(len(names))
         for a, idx in zip(self.agents, order):
             a.genome.surname = names[int(idx)]
+
+    def _shuffle_identities(self) -> None:
+        """KONTROL: TANIMA kimliklerini yasayanlar arasinda karistirir.
+
+        Defter artik yanlis bireyi gosterir — "bu bana yardim etmisti" bilgisi
+        tanimi geregi bilgisiz olur. Karsiliklilik bu kontrolde COKMELI.
+
+        `id` DOKUNULMAZ: ajan sirasi ve determinizm ona baglidir; yalnizca
+        `mem_id` permute edilir.
+        """
+        if len(self.agents) < 2:
+            return
+        ids = [a.mem_id for a in self.agents]
+        order = self.rng.permutation(len(ids))
+        for a, idx in zip(self.agents, order):
+            a.mem_id = ids[int(idx)]
+
+    def _remember(self, owner: Agent, partner: Agent, delta: float) -> None:
+        """Defterine yaz: ALICI kaydeder, veren degil.
+
+        Kapasite dolunca EN ZAYIF kayit (|deger| en kucuk, esitlikte en kucuk
+        kimlik) atilir — deterministik, sozluk sirasina bagimli degil.
+        """
+        if not self.memory_on:
+            return
+        led = owner.ledger
+        key = partner.mem_id
+        led[key] = led.get(key, 0.0) + delta
+        if len(led) > self.memory_capacity:
+            victim = min(led.items(), key=lambda kv: (abs(kv[1]), kv[0]))[0]
+            del led[victim]
 
     def _record_epoch(self) -> None:
         """steady_state modunda periyodik evrim raporu.
@@ -728,6 +790,19 @@ def _empty_stats() -> dict:
         "share_benefit_fit": 0.0,  # ayni sey FITNESS birimi TAHMINIYLE (varsayim!)
         "share_rescue": 0,      # olmek uzere olan bir aliciya yapilan paylasim
         "energy_created": 0.0,  # paylasimin yarattigi/yok ettigi net enerji (Faz 4.5)
+        # --- Faz 5: karsiliklilik (defter isaretine kosullu) ---
+        "oppr_pos": 0,          # defteri POZITIF olan partnerle firsat
+        "oppr_nonpos": 0,
+        "oppg_neg": 0,          # defteri NEGATIF olan partnerle firsat
+        "oppg_nonneg": 0,
+        **{f"oppr_pos_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"oppr_non_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"rcp_pos_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"rcp_non_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"oppg_neg_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"oppg_non_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"rtl_neg_{b}": 0 for b in range(ENERGY_BUCKETS)},
+        **{f"rtl_non_{b}": 0 for b in range(ENERGY_BUCKETS)},
         # --- Faz 3 adim 2: saldiri ---
         "attack_events": 0,
         "attack_damage": 0.0,

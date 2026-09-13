@@ -24,6 +24,9 @@ class Physics:
     energy_per_unit: float
     max_speed: float
     max_turn: float
+    # --- Faz 5: tanima/hafiza kanali (sicak yolda config agaci dolasilmaz) ---
+    memory_enabled: bool
+    memory_scale: float
 
     @classmethod
     def from_config(cls, cfg) -> "Physics":
@@ -37,4 +40,6 @@ class Physics:
             energy_per_unit=float(cfg.world.food.energy_per_unit),
             max_speed=float(mot.max_speed),
             max_turn=float(mot.max_turn),
+            memory_enabled=bool(cfg.get("rules.memory.enabled", False)),
+            memory_scale=max(1e-6, float(cfg.get("rules.memory.scale", 8.0))),
         )
