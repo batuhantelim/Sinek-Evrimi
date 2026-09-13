@@ -171,6 +171,48 @@ class TestExperimentValidity(unittest.TestCase):
             self.assertNotIn(banned, body, f"fitness '{banned}' okuyor")
 
 
+class TestParamMigration(unittest.TestCase):
+    """Sozlesme buyudugunde YENI PARAMETRELER de tasinmali.
+
+    Bu test Faz 6'da eklendi cunku tam tersi oldu: kayitli genomlarda
+    `pick_*` yoktu, `mutate` mevcut anahtarlar uzerinde gezdigi icin onlar
+    asla mutasyona ugramadi ve partner secimi SESSIZCE olu kaldi — secim
+    kolu, secimsiz kolla birebir ayni sonuc verdi.
+    """
+
+    def test_missing_params_are_added_with_config_defaults(self):
+        import tempfile
+
+        from sinek.persistence import load_population, save_population
+
+        sim = make(agents__initial_count=8)
+        for a in sim.agents:                      # eski kayit: pick_* yok
+            for name in [k for k in a.genome.params if k.startswith("pick")]:
+                del a.genome.params[name]
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "pop.npz")
+            save_population(path, sim)
+            genomes, meta = load_population(path, sim.cfg)
+        self.assertIn("pick_kin", genomes[0].params, "yeni parametre tasinmadi")
+        self.assertEqual(genomes[0].params["pick_kin"], 0.0, "config varsayilaniyla baslamali")
+        self.assertIn("new_params", meta["migrated"], "tasima SESSIZ olmamali")
+        self.assertIn("pick_kin", meta["migrated"]["new_params"])
+
+    def test_migrated_params_actually_mutate(self):
+        """Tasinan parametre mutasyona girmeli; yoksa mekanik olu kalir."""
+        sim = make(agents__initial_count=4)
+        g = sim.agents[0].genome
+        before = g.params["pick_kin"]
+        moved = False
+        for _ in range(400):
+            child = g.child(sim.cfg, sim.rng)
+            if child.params["pick_kin"] != before:
+                moved = True
+                break
+            g = child
+        self.assertTrue(moved, "pick_kin hic mutasyona ugramadi")
+
+
 class TestDeterminism(unittest.TestCase):
     def test_same_seed_same_state(self):
         a = make(steps=200, rules__partner__enabled=True)

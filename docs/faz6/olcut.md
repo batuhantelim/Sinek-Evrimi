@@ -67,3 +67,31 @@ kurmadı" diye raporlanır — ikisi ayrı sorudur.
 çalışmıyor — akrabalık, karşılıklılık, partner seçimi. Kapsamlı bir negatif.
 Ama ancak seçim yeteneğinin gerçekten **kullanıldığı** (`pick_not_nearest > 0`)
 gösterilirse böyle denebilir.
+
+---
+
+## EK (ilk parti sonrası, 2026-09-13): ÖNKOŞUL — aday havuzu
+
+İlk parti koştuktan sonra ortaya çıktı: **seçim mekaniği hiç devreye
+girmemişti.** İki ayrı neden:
+
+1. **Kayıtlı genomlarda `pick_*` parametreleri yoktu.** `load_population`
+   yalnızca dosyada yazılı isimleri yüklüyordu; `mutate` de mevcut anahtarlar
+   üzerinde gezdiği için yeni parametreler **asla mutasyona uğramadı**.
+   Seçim kolu, seçimsiz kolla **birebir aynı** `state_hash` verdi. Ağırlık
+   taşımasının parametre karşılığı eksikti; eklendi ve taşıma artık
+   `meta["migrated"]["new_params"]` ile **raporlanıyor** (sessiz değil).
+2. **Aday havuzu ortalama 1.4 kişi.** `kinship.radius = 2.5` ile çoğu ajanın
+   menzilinde tek komşu var; seçilecek bir şey yok.
+
+Bu, Faz 5'in "üç önkoşul" disiplininin aynısı: **seçim, seçenek olmadan
+ölçülemez.** Dolayısıyla ana soru (ölçüt 3) henüz **hiç test edilmedi**.
+
+### Yeni önkoşul (ana ölçüt bundan sonra okunur)
+
+Ortalama aday havuzu **≥ 2.0** ve kararların **≥ %50'sinde en az 2 aday**
+bulunmalı. Sağlanmazsa `rules.kinship.radius` yükseltilir — **her iki kola da
+birebir aynı** uygulanır ve yan etkileri (işbirliği tabanı, dış-grup payı,
+`genetic_r`, kişi başı toplama) raporlanır.
+
+Ölçüt 1–4 aynen geçerli.

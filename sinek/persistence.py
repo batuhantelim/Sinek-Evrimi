@@ -164,9 +164,29 @@ def load_population(
         order = order[: max(1, top)]
 
     names = list(meta["param_names"])
+    # YENI PARAMETRE TASIMASI. Sozlesme buyudugunde agirlik sutunlari sifirla
+    # eklenir; ISIMLI PARAMETRELER icin de aynisi gerekir. Yoksa kayitta
+    # olmayan bir parametre (or. Faz 6'nin `pick_*` agirliklari) genomda hic
+    # olusmaz, `mutate` mevcut anahtarlar uzerinde gezdigi icin ASLA
+    # mutasyona ugramaz ve mekanik SESSIZCE olu kalir — birebir bu oldu.
+    # Yeni parametre config VARSAYILANIYLA baslar (pick_* icin 0.0), yani
+    # davranis birebir korunur ve mutasyon zamanla acar.
+    missing: list[str] = []
+    if cfg is not None:
+        for name in cfg.genome.params.to_dict():
+            if name not in names:
+                missing.append(name)
+    defaults = cfg.genome.params.to_dict() if cfg is not None else {}
+    if missing:
+        meta["migrated"] = dict(meta.get("migrated") or {})
+        meta["migrated"]["new_params"] = missing
+
     genomes = [
         Genome(
-            params={n: float(v) for n, v in zip(names, params[i])},
+            params={
+                **{n: float(defaults[n]) for n in missing},
+                **{n: float(v) for n, v in zip(names, params[i])},
+            },
             weights=np.asarray(weights[i], dtype=np.float32).copy(),
             lineage=int(lineage[i]),
             surname=int(surname[i]),
