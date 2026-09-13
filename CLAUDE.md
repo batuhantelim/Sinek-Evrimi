@@ -39,6 +39,7 @@ davranış oradan **türer**.
 | **Faz 4 — adım 1** | Doğal avcı (grup-kör); düşmanlık da sürü işbirliği de çıkmadı | ✅ **tamam** |
 | **Faz 4 — tanı** | Rejim çatalı: gerçek ama havzalar eşit değil; ölçülebilir taban bulundu | ✅ **tamam** |
 | **Faz 4.5** | Ekoloji borcu: paylaşım enerji yaratıyordu; zincir onarıldı, Faz 3 sonucu tekrarlanmadı | ✅ **tamam** |
+| **Faz 4.6** | Korunumlu zeminde `r·b > c` araması: 15 koşulun hiçbiri eşiği geçmedi | ✅ **tamam** |
 | **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 4).
@@ -84,6 +85,7 @@ tools/predator_sweep.py Faz 4 avcı 2×2 taraması + D/Ç sınıflandırması
 tools/basin_map.py      Rejim havzası haritalama (eşik veriden türetilir)
 tools/surplus_probe.py  Paylaşım verici enerji katmanına göre: fazlalık mı, maliyet mi?
 tools/selection_probe.py  Enerji → üreme → seçilim zinciri sağlıklı mı (tamamlanmış yaşamlar)
+tools/hamilton_probe.py   Hamilton'un b ve c'sini YAVRU cinsinden ölçer (varsaymaz)
 tests/                  unittest — determinizm + faz testleri + araç/yöntem testleri
 ```
 
@@ -549,6 +551,56 @@ altında). Temiz ekolojide **düşmanlık ayrım gözetiyor, fedakârlık gözet
 
 ---
 
+## 3.9 Faz 4.6: korunumlu zeminde `r·b > c` aranması
+
+Tam rapor: **[docs/faz46/hamilton_arayisi.md](docs/faz46/hamilton_arayisi.md)**
+
+### İki ölçüm tuzağı kapatıldı
+
+1. **`r` etiketten okunamaz.** `kin_assortment` soyisim eşitliğini ölçer; aynı
+   soyisim mutasyonla ayrışır, `split_rate` ile ayrılan soylar ayrılma anında
+   genetik olarak aynıdır. Yeni metrik `genetic_r`: aktör ile en yakın
+   komşusunun **genom** benzerliği (regresyon tanımı, rastgele eşleşmede 0,
+   klonlarda 1).
+2. **`b/c` varsayılamaz.** `need_bonus` çarpanını muhasebeye koyup "`b/c` = 2.3"
+   demek kendi varsayımını ölçmektir. `bc_ratio` (enerji, ≤ 1) ile
+   `bc_ratio_fit` (çarpanlı **tahmin**) ayrıldı; asıl ölçüm
+   `tools/hamilton_probe.py` ile **yavru cinsinden** yapılır:
+   `yavru ~ yaş + yemek + VERİLEN + ALINAN`. Ölçüm varsayımı çürüttü:
+   tahmin 2.0–2.9, **ölçülen 0.64–1.48**.
+
+### Sonuç: eşik aşılamıyor, ve nedeni yapısal
+
+15 dürüst koşul (hepsinde enerji korunumu TAM), `r·b/c` aralığı **0.475–0.989**,
+**1'i geçen 0/15**.
+
+- **`b/c` kolu yapısal tıkalı**: `c = amount + overhead`, `b ≤ amount` ⇒ enerji
+  `b/c ≤ 1`. Azalan verimin ölçülen gerçek payı yalnızca %10–48.
+- **`r` kolu ekolojik tıkalı**: 0.89'un üstü için hareketi daha da kısmak
+  gerekiyor, o da koloniyi çökertiyor (`max_speed` 0.02 → N = 17).
+- **İkisi birlikte büyümüyor**: korelasyon(`r`, `b/c`) = **−0.51**. Akrabaları
+  sıkıştırmak `r`'yi ×2.09 artırırken `b/c`'yi 1.48 → 0.98'e düşürüyor.
+
+Kontrollü evrim testi (en iyi ölçülebilir nokta, `r·b/c` = 0.901, 5 seed):
+ayrışma **3/5** (ölçüt ≥2/3 istiyordu), etki **0.16 puan** — Faz 3'ün pompalı
+zemininde bu fark +28 puandı. `r·b/c` = 0.989'a çıkan koşul ise dış-grup
+payını %3–9'a düşürüp **ölçülemez** hale geldi.
+
+### ⚠ Kaldıraç beklentinin tersine çıktı
+
+`min_donor_energy` 10 → 100 ("yalnız tok olan versin, maliyet düşsün"): `ĉ`
+düşmedi, **`b̂` düştü** (0.0126 → 0.0083) ve `b/c` 0.98 → 0.64'e indi. Paylaşım
+fırsatları zaten iyi durumdaki çiftlere daraldığı için. Ölçülmeseydi ters
+raporlanacaktı.
+
+### Yan bulgu
+
+Saldırı 5/5 seed'de yabancıya yöneliyor (`atk_t` −6.7…−14.7) — korunumlu
+zeminde **düşmanlık ayrım gözetiyor, fedakârlık gözetmiyor**. Faz 4.5'in yan
+bulgusu farklı bir koşulda tekrarlandı.
+
+---
+
 ## 4. Nasıl çalıştırılır
 
 ```bash
@@ -559,7 +611,7 @@ python run.py --steps 2000 --viz none    # sadece metrik, en hızlısı
 python run.py --viz pygame               # canlı pencere (SPACE: duraklat, Q: çık)
 python run.py --seed 7 --name deney7
 python run.py --check-determinism
-python -m unittest discover -s tests     # 103 test
+python -m unittest discover -s tests     # 107 test
 ```
 
 Hazır deneyler (`experiments/README.md`):
@@ -588,6 +640,8 @@ Faz 4.5'in **temiz ekolojisi** (korunumlu paylaşım + bağlayıcı olmayan tava
 python run.py --config experiments/faz45_ekoloji.yaml \
   --load-genomes docs/faz4tani/population_taban.npz --seed 42
 python tools/selection_probe.py --steps 8000   # enerji -> ureme -> secilim
+python tools/hamilton_probe.py --steps 8000 \
+  --set agents.motors.max_speed=0.05 --set rules.share.overhead=0.0   # r, b, c
 ```
 
 Faz 4'ün 2×2'si (dört kol da Faz 2 tohumuyla, her biri kendi kontrolüyle):
@@ -671,7 +725,7 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `opp_kin`, `opp_nonkin` | örneklem büyüklükleri (küçükse oran gürültüdür) |
 | `kin_assortment` | `(gözlenen−beklenen)/(1−beklenen)` ≈ Hamilton'un `r`'si |
 | `kin_expected`, `kin_observed` | assortment'in taban çizgisi ve gözlemi |
-| `bc_ratio` | gerçekleşen `b/c` — doğrusal aktarımda yapısal olarak ≤ 1 |
+| `bc_ratio` | **ENERJİ** birimi `b/c` — korunumlu aktarımda yapısal olarak ≤ 1 |
 | `rescue_share` | paylaşımların kaçı ölmek üzere olan birine gitti |
 | `attack_events`, `attack_damage`, `attack_kills`, `death_killed` | saldırı muhasebesi |
 | `hostility_rate` | saldırı / fırsat |
@@ -681,6 +735,8 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `predation_risk` | kişi başı avlanma baskısı (öldürme / ajan) |
 | `forage_per_capita`, `share_per_capita` | ajan-adım başına **mutlak** toplama / aktarım (oran değil) |
 | `energy_created` | paylaşımın yarattığı/yok ettiği net enerji — korunumlu modda **tam 0** |
+| `genetic_r`, `genetic_r_pairs` | Hamilton'un `r`'si: aktör–komşu **genom** benzerliği (etiket değil) |
+| `bc_ratio_fit` | `need_bonus` çarpanlı `b/c` **tahmini** — bir varsayım, kanıt değil |
 | `repro_blocked`, `at_cap` | tavan yüzünden yanan üreme hakkı / popülasyon tavana değdi mi |
 | `gp_<parametre>` | her genom parametresinin popülasyon ortalaması — evrimin **yönü** |
 | `cooperation_rate` | Faz 3 için ayrılmış |
@@ -939,6 +995,28 @@ Tam tablo: **[docs/faz45/ekoloji_borcu.md](docs/faz45/ekoloji_borcu.md)**
   vardı ama satıra hiç yazılmıyordu; CSV'de boş hücre, `summary.txt`'de 0
   görünüyordu.
 
+### Faz 4.6 — korunumlu zeminde `r·b > c` araması (15 sonda + 16 kontrollü koşum)
+
+Tam tablo: **[docs/faz46/hamilton_arayisi.md](docs/faz46/hamilton_arayisi.md)**
+
+- **Eşik aşılamadı: `r·b/c` en yüksek 0.989, 0/15 koşul 1'i geçti.** Enerji
+  korunumu 15/15 koşumda tam.
+- **`b` ve `c` ölçüldü, varsayılmadı.** Yavru cinsinden regresyon (yaş + yemek
+  kontrollü): `b̂` ve `ĉ` her koşulda sıfırdan açıkça farklı (|t| = 10–70).
+  **`need_bonus` varsayımı gerçek faydayı 2–3 kat fazla tahmin ediyormuş**
+  (tahmin 2.0–2.9, ölçülen 0.64–1.48).
+- **`r` ile `b/c` ters hareket ediyor** (korelasyon −0.51). Akrabaları
+  sıkıştırmak `r`'yi 0.43 → 0.89 çıkarıyor ama `b/c`'yi 1.48 → 0.98'e
+  düşürüyor: komşular zaten benzer ve benzer doygunlukta.
+- **En iyi ölçülebilir noktada sinyal ölçütü geçmiyor**: `r·b/c` = 0.901'de
+  ayrışma 3/5 seed (ölçüt ≥2/3), etki 0.16 puan (Faz 3'ün pompalı zemininde
+  +28 puandı). `r·b/c` = 0.989'a çıkan koşul dış-grup payını %3–9'a düşürüp
+  ölçülemez hale geldi.
+- **⚠ `min_donor_energy` kaldıracı beklentinin TERSİNE çalıştı**: 10 → 100
+  yapınca `ĉ` düşmedi, `b̂` düştü (0.0126 → 0.0083), `b/c` 0.98 → 0.64.
+- Yan bulgu: saldırı 5/5 seed'de yabancıya yöneliyor (`atk_t` −6.7…−14.7).
+  Korunumlu zeminde düşmanlık ayrım gözetiyor, fedakârlık gözetmiyor.
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -979,11 +1057,12 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
 3. ✅ **Ekoloji borcu** kapatıldı (§3.8). Popülasyonu artık çevre sınırlıyor,
    seçilim zinciri sağlam, paylaşım korunumlu. Yeni taban:
    `experiments/faz45_ekoloji.yaml`.
-4. **Faz 3'ün bulgusu temiz zeminde yok.** Adım 2'ye geçmeden önce karar
-   verilmeli: fedakârlığın korunumlu bir dünyada evrimleşebileceği bir kanal
-   var mı? Sonda "almak" için fitness getirisinin gerçek olduğunu söylüyor
-   (+0.319); eksik olan bunun **seçilime görünür** hale gelmesi. Bu, melez
-   soyisimden önce cevaplanacak soru.
+4. ✅ **Soru cevaplandı (§3.9): bu mekanik repertuvarda `r·b > c` ulaşılamıyor.**
+   `b/c` kolu yapısal (korunumlu aktarımda ≤ 1), `r` kolu ekolojik (0.89 üstü
+   koloniyi çökertiyor) ve ikisi ters hareket ediyor. Fedakârlık istenirse
+   **yeni bir kanal** gerekir: misilleme/hafıza, itibar, tekrarlı etkileşim,
+   kısmi akrabalık (melez soyisim) veya grup seçilimi. Bunlardan biri
+   eklenmeden fedakârlık beklenmemeli.
 5. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
    etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
    etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
@@ -1096,4 +1175,16 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
   kendi kontrolüne karşı 5/5 ayrışıyordu ve ölçüm doğruydu — ama o dünyada
   paylaşım enerji üretiyordu. Zemin değişince 0/5. Zemini değiştiren her
   düzeltmeden sonra ana bulguları **yeniden doğrulayın**.
+- **`r`'yi ETİKETTEN değil GENOMDAN okuyun.** `kin_assortment` soyisim
+  eşitliğidir; `genetic_r` genom benzerliğidir. Hamilton eşitsizliği ikincisiyle
+  çalışır — aynı soyisim mutasyonla ayrışır, yeni bölünen soy ise ayrılma
+  anında genetik olarak aynıdır.
+- **Bir katsayıyı muhasebeye koyup onunla kanıt üretmeyin.** `need_bonus`
+  çarpanlı `b/c` bir varsayımdır (`bc_ratio_fit`), ondan "Hamilton sağlandı"
+  çıkmaz. `b` ve `c` simülasyonun kendi para biriminde — **yavru** cinsinden —
+  ölçülür (`tools/hamilton_probe.py`). Ölçüm, varsayımı 2–3 kat fazla
+  bulmuştu.
+- **Eşiğe yaklaşırken ölçülebilirliği kaybetmeyin.** `r·b/c` 0.989'a çıkan
+  koşul dış-grup fırsat payını %3'e düşürdü; o kol okunmaz. Her taramada
+  ölçülebilirlik şartını da denetleyin.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.

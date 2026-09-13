@@ -1,0 +1,10 @@
+====================================================================================================
+HAMILTON SONDASI — b ve c YAVRU biriminde OLCULUR (varsayilmaz)
+  yavru ~ yas + yemek + VERILEN + ALINAN   (yas ve yemek kontrollu)
+====================================================================================================
+  kosul             r(genom)  b/c enerji  b/c fit*     b_hat      t     c_hat      t  b/c OLCULEN    r*b/c   korunum
+  R2                  0.7669       0.833     2.327   0.01259  +70.0   0.01290  +64.1        0.976    0.748     TAMAM
+
+  * b/c fit: need_bonus carpanli TAHMIN — bir varsayimdir, kanit degildir.
+  r*b/c > 1 ise teori akraba fedakarligini pozitif secilimde bekler.
+  c_hat <= 0 ise 'vermek maliyetli degil' demektir: Hamilton sorusu dusmez.
