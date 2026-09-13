@@ -116,6 +116,12 @@ class Simulation:
         self.memory_control = str(cfg.get("rules.memory.control", "none"))
         if self.memory_control not in ("none", "shuffle_ledger", "shuffle_identity"):
             raise ValueError(f"bilinmeyen rules.memory.control={self.memory_control!r}")
+        # --- Faz 6: partner secimi ---
+        self.partner_on = bool(cfg.get("rules.partner.enabled", False)) and self._social_enabled
+        self.partner_k = max(1, int(cfg.get("rules.partner.candidates", 4)))
+        self.partner_control = str(cfg.get("rules.partner.control", "none"))
+        if self.partner_control not in ("none", "random"):
+            raise ValueError(f"bilinmeyen rules.partner.control={self.partner_control!r}")
 
         self.founder = founder_genome(cfg, self.rng)
         n0 = int(cfg.agents.initial_count)
@@ -210,8 +216,13 @@ class Simulation:
                 self._shuffle_ledgers()
             elif self.memory_control == "shuffle_identity":
                 self._shuffle_identities()
-            for a in self.agents:
-                a.nearest = self.hash.nearest(a, self.kin_radius, self.world)
+            if self.partner_on:
+                # Faz 6: hedef artik dayatilmiyor, SECILIYOR.
+                for a in self.agents:
+                    a.nearest = self._choose_partner(a)
+            else:
+                for a in self.agents:
+                    a.nearest = self.hash.nearest(a, self.kin_radius, self.world)
 
         # 3) algi -> karar -> eylem
         phys = self.physics
@@ -684,6 +695,94 @@ class Simulation:
         for a, idx in zip(self.agents, order):
             a.genome.surname = names[int(idx)]
 
+    def _choose_partner(self, a: Agent):
+        """Faz 6: aday havuzundan hedefi SECER.
+
+        Skor GENOMDAN gelir — kodda tek bir tercih katsayisi yoktur:
+
+            skor = pick_kin*kin + pick_ledger*defter + pick_need*ihtiyac
+                   + pick_energy*enerji + pick_dist*(-mesafe)
+
+        Tum agirliklar 0 baslar; o zaman skor herkeste 0'dir ve beraberligi
+        MESAFE bozar (aday listesi mesafeye gore sirali), yani davranis
+        secimsiz kolla OZDESTIR. "Iyi partner sec" diye bir kural yoktur.
+        """
+        pool = self.hash.candidates(a, self.kin_radius, self.world, self.partner_k)
+        if not pool:
+            self._pick_pool_reset()
+            return None
+        if len(pool) == 1:
+            self._note_pick(a, pool, 0)
+            return pool[0][0]
+        if self.partner_control == "random":
+            # KONTROL: secme yetenegi var, politika yok.
+            idx = int(self.rng.integers(0, len(pool)))
+            self._note_pick(a, pool, idx)
+            return pool[idx][0]
+
+        p = a.genome.params
+        w_kin = p.get("pick_kin", 0.0)
+        w_led = p.get("pick_ledger", 0.0)
+        w_need = p.get("pick_need", 0.0)
+        w_en = p.get("pick_energy", 0.0)
+        w_dist = p.get("pick_dist", 0.0)
+        e_max = self.physics.energy_max
+        best_i, best_score = 0, None
+        for i, (other, d2) in enumerate(pool):
+            kin = 1.0 if other.genome.surname == a.genome.surname else -1.0
+            led = 0.0
+            if self.memory_on:
+                bal = a.ledger.get(other.mem_id)
+                if bal is not None:
+                    led = math.tanh(bal / self.physics.memory_scale)
+            frac = other.energy / e_max
+            score = (
+                w_kin * kin + w_led * led + w_need * (1.0 - frac)
+                + w_en * frac + w_dist * (-math.sqrt(d2))
+            )
+            # Beraberlikte once gelen (daha yakin, sonra kucuk id) kazanir.
+            if best_score is None or score > best_score:
+                best_i, best_score = i, score
+        self._note_pick(a, pool, best_i)
+        return pool[best_i][0]
+
+    def _pick_pool_reset(self) -> None:
+        pass
+
+    def _note_pick(self, a: Agent, pool, idx: int) -> None:
+        """KIMI sectigini olcer: secilenin profili vs ADAY HAVUZUNUN profili.
+
+        Politika evrimlesmediyse ikisi ayni cikar. Bu yuzden "secim akrabaya
+        yoneldi" iddiasi havuz ortalamasina karsi okunur, sifira karsi degil.
+        """
+        stats = self.stats_step
+        stats["pick_events"] += 1
+        stats["pick_pool"] += len(pool)
+        if idx != 0:
+            stats["pick_not_nearest"] += 1
+        chosen = pool[idx][0]
+        near = pool[0][0]          # politika olmasaydi secilecek olan
+        if chosen.genome.surname == a.genome.surname:
+            stats["pick_kin"] += 1
+        # ⚠ ASIL REFERANS EN YAKIN, havuz ortalamasi DEGIL. Akrabalar uzamsal
+        # kumelendigi icin en yakin zaten havuz ortalamasindan daha sik
+        # akrabadir; havuza karsi okunan secicilik, politika hic yokken bile
+        # +0.05 cikiyor (olculdu). Politikanin KENDI katkisi ancak "secilen vs
+        # en yakin" farkiyla izole edilir.
+        if near.genome.surname == a.genome.surname:
+            stats["near_kin"] += 1
+        stats["pool_kin"] += sum(
+            1 for o, _ in pool if o.genome.surname == a.genome.surname
+        )
+        if self.memory_on:
+            if a.ledger.get(chosen.mem_id, 0.0) > 0.0:
+                stats["pick_ledger_pos"] += 1
+            if a.ledger.get(near.mem_id, 0.0) > 0.0:
+                stats["near_ledger_pos"] += 1
+            stats["pool_ledger_pos"] += sum(
+                1 for o, _ in pool if a.ledger.get(o.mem_id, 0.0) > 0.0
+            )
+
     def _shuffle_ledgers(self) -> None:
         """KONTROL (ASIL): her ajanin defterindeki DEGERLERI kendi partnerleri
         arasinda karistirir.
@@ -818,6 +917,16 @@ def _empty_stats() -> dict:
         "share_benefit_fit": 0.0,  # ayni sey FITNESS birimi TAHMINIYLE (varsayim!)
         "share_rescue": 0,      # olmek uzere olan bir aliciya yapilan paylasim
         "energy_created": 0.0,  # paylasimin yarattigi/yok ettigi net enerji (Faz 4.5)
+        # --- Faz 6: partner secimi ---
+        "pick_events": 0,       # kac kez aday havuzundan secim yapildi
+        "pick_pool": 0,         # toplam aday (ortalama havuz buyuklugu icin)
+        "pick_not_nearest": 0,  # secim EN YAKIN olmayani sectiyse
+        "pick_kin": 0,          # secilen akraba miydi
+        "near_kin": 0,          # EN YAKIN akraba miydi (ASIL referans)
+        "pool_kin": 0,          # havuzdaki akraba sayisi (konfoundlu referans)
+        "pick_ledger_pos": 0,   # secilenin defteri pozitif miydi
+        "near_ledger_pos": 0,
+        "pool_ledger_pos": 0,
         # --- Faz 5: karsiliklilik (defter isaretine kosullu) ---
         "oppr_pos": 0,          # defteri POZITIF olan partnerle firsat
         "oppr_nonpos": 0,

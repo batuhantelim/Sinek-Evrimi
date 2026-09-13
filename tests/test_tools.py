@@ -307,6 +307,16 @@ class TestBasinMap(unittest.TestCase):
         haf["rules"]["memory"]["enabled"] = False
         self.assertEqual(_mechanics(haf), _mechanics(eko))
 
+    def test_phase6_choice_only_adds_partner_selection(self):
+        """Faz 6'nin iddiasi: 'rejim Faz 5 ile ayni, yalnizca partner secimi
+        acildi'."""
+        sec = load_config(os.path.join(ROOT, "experiments", "faz6_secim.yaml")).to_dict()
+        haf = load_config(os.path.join(ROOT, "experiments", "faz5_hafiza.yaml")).to_dict()
+        self.assertTrue(sec["rules"]["partner"]["enabled"])
+        self.assertFalse(haf["rules"]["partner"]["enabled"])
+        sec["rules"]["partner"] = haf["rules"]["partner"]
+        self.assertEqual(_mechanics(sec), _mechanics(haf))
+
     def test_predator_is_off(self):
         cfg = load_config(
             overrides=seed_sweep.FIXED + seed_sweep.REGIME + [basin_map.PREDATOR_OFF]

@@ -110,6 +110,18 @@ genome:
     panic_speed: 0.60       # tehlike yakininda hizlanma
     hunger_speed: 0.25      # aclikta hizlanma
     share_urge: 0.00        # refleks beynin kosulsuz paylasim egilimi (Faz 3)
+    # --- FAZ 6: PARTNER SECIMI agirliklari ---
+    # Ajan, menzildeki k aday arasindan hedefini bu agirliklarla SECER:
+    #   skor = pick_kin*kin + pick_ledger*defter + pick_need*ihtiyac
+    #          + pick_energy*enerji + pick_dist*(-mesafe)
+    # Hepsi 0.0 baslar: saf beraberlik -> en yakin, yani secimsiz kolla
+    # OZDES baslangic. "Iyi partner sec" diye bir kural YOKTUR; politikayi
+    # evrim bulursa bulur. `gp_pick_*` ortalamalari ne buldugunu gosterir.
+    pick_kin: 0.00
+    pick_ledger: 0.00
+    pick_need: 0.00
+    pick_energy: 0.00
+    pick_dist: 0.00
 
 evolution:
   enabled: true           # FAZ 2: mutasyon ACIK. false -> klonlar (Faz 1 kontrolu)
@@ -164,6 +176,11 @@ evolution:
     panic_speed: [0.0, 2.0]
     hunger_speed: [0.0, 1.5]
     share_urge: [0.0, 1.0]
+    pick_kin: [-2.0, 2.0]
+    pick_ledger: [-2.0, 2.0]
+    pick_need: [-2.0, 2.0]
+    pick_energy: [-2.0, 2.0]
+    pick_dist: [-2.0, 2.0]
 
 rules:
   # =================================================================
@@ -219,6 +236,21 @@ rules:
     steal_ratio: 0.5        # kaybin ne kadari saldirana gecer
     cost: 2.0               # saldirganin sabit maliyeti (risk) — bedava degil
     min_attacker_energy: 10.0
+
+  partner:
+    # FAZ 6 — PARTNER SECIMI: ajan KIMINLE etkilesecegini secer.
+    #
+    # Faz 5'e kadar hedef her zaman EN YAKIN komsuydu; kiminle paylasacagini
+    # mekan dayatiyordu. Burada menzildeki en yakin `candidates` aday bulunur
+    # ve ajan aralarindan genomundaki `pick_*` agirliklariyla secer.
+    #
+    # SECME YETENEGI verilir, POLITIKA verilmez.
+    #   none   : normal kosum (genom secer)
+    #   random : KONTROL — aday havuzu var ama secim rastgele. "Secme
+    #            yetenegi mi, secimin AKILLI kullanimi mi" ayrimi icin.
+    enabled: true
+    candidates: 4
+    control: none
 
   memory:
     # FAZ 5 — TANIMA + HAFIZA: karsiliklilik icin gereken iki onkosul.

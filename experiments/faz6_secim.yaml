@@ -1,0 +1,41 @@
+# FAZ 6 — PARTNER SEÇİMİ: ajan KİMİNLE etkileşeceğini seçer.
+#
+# Rejim Faz 5 ile BİREBİR aynı (korunumlu paylaşım, çevre-sınırlı popülasyon,
+# tanıma + hafıza açık). Tek fark `rules.partner.enabled: true`.
+#
+# Faz 5'e kadar hedef her zaman EN YAKIN komşuydu; kiminle paylaşacağını mekân
+# dayatıyordu. Burada menzildeki en yakın `candidates` aday bulunur ve ajan
+# aralarından genomundaki `pick_*` ağırlıklarıyla seçer.
+#
+# SEÇME YETENEĞİ verilir, POLİTİKA verilmez: beş ağırlık 0.0 başlar (saf
+# beraberlik → en yakın, yani seçimsiz kolla ÖZDEŞ başlangıç) ve mutasyona
+# uğrar. "İyi partner seç" diye bir kural yoktur.
+#
+#   python run.py --config experiments/faz6_secim.yaml \
+#     --load-genomes docs/faz5/population_hafiza.npz --seed 42
+run:
+  name: faz6_secim
+  steps: 12000
+agents:
+  max_count: 5000
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+rules:
+  partner:
+    enabled: true
+    candidates: 4
+  memory:
+    enabled: true
+  predator:
+    enabled: false
+  share:
+    need_bonus: 3.0
+    need_mode: fitness
+  attack:
+    enabled: true
+viz:
+  color_by: lineage
+  every: 50

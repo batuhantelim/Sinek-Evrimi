@@ -45,6 +45,7 @@ REGIME = [
     # Faz 5 hafizasi bu rejimin parcasi DEGIL: varsayilan ilerledi diye
     # eski tarama sessizce baska bir deney olmasin.
     "rules.memory.enabled=false",
+    "rules.partner.enabled=false",
 ]
 FIXED = ["viz.mode=none", "metrics.enabled=false"]
 SEED_POP = "docs/faz2/population.npz"

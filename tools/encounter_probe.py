@@ -48,6 +48,7 @@ REGIME = [
     # Faz 5 hafizasi bu rejimin parcasi DEGIL: varsayilan ilerledi diye
     # eski tarama sessizce baska bir deney olmasin.
     "rules.memory.enabled=false",
+    "rules.partner.enabled=false",
 ]
 SEED_POP = "docs/faz45/population_ekoloji.npz"
 

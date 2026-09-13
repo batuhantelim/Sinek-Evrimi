@@ -53,6 +53,13 @@ BASE_COLUMNS = [
     "kin_expected",       # iyi karismis dunyada beklenen akraba-komsu orani
     "kin_observed",       # gozlenen akraba-komsu orani
     "kin_assortment",     # (gozlenen-beklenen)/(1-beklenen)  ~ Hamilton'un r'si
+    "pick_not_nearest",   # secim EN YAKIN olmayani sectiyse (Faz 6)
+    "pool_size",          # ortalama aday havuzu buyuklugu
+    "pick_kin_rate",      # secilenin akraba olma orani
+    "pool_kin_rate",      # HAVUZDAKI akraba orani (referans)
+    "pick_kin_sel",       # secicilik: secilen - EN YAKIN (0 ise politika yok)
+    "pick_kin_sel_raw",   # secilen - havuz ortalamasi — KONFOUNDLU, kanit degil
+    "pick_ledger_sel",    # ayni sey defteri pozitif partner icin
     "recip_bias",         # ham P(paylas|defter+) - P(paylas|defter<=0) — KONFOUNDLU
     "recip_bias_adj",     # enerji katmanli karsiliklilik (guvenilen olcu, Faz 5)
     "retal_bias_adj",     # enerji katmanli MISILLEME (bana saldirana saldirdim mi)
@@ -457,6 +464,33 @@ def social_rates(stats: dict) -> dict[str, float]:
         "kin_bias_adj": round(stratified_kin_bias(stats), 5),
         "opp_kin": int(opp_kin),
         "opp_nonkin": int(opp_non),
+        # --- Faz 6: PARTNER SECIMI ---
+        # "Kimi seciyor" sorusu, ADAY HAVUZUNUN profiline karsi okunur;
+        # sifira karsi degil. Politika evrimlesmediyse ikisi esittir.
+        "pick_not_nearest": round(
+            _ratio(stats.get("pick_not_nearest", 0), stats.get("pick_events", 0)), 5
+        ),
+        "pool_size": round(_ratio(stats.get("pick_pool", 0), stats.get("pick_events", 0)), 4),
+        "pick_kin_rate": round(
+            _ratio(stats.get("pick_kin", 0), stats.get("pick_events", 0)), 5
+        ),
+        "pool_kin_rate": round(_ratio(stats.get("pool_kin", 0), stats.get("pick_pool", 0)), 5),
+        # ⚠ ASIL OLCU: secilen vs EN YAKIN. Havuz ortalamasina karsi okumak
+        # konfoundludur — akrabalar uzamsal kumelendigi icin en yakin zaten
+        # havuzdan daha sik akrabadir; politika hic yokken bile +0.05 cikiyor.
+        "pick_kin_sel": round(
+            _ratio(stats.get("pick_kin", 0), stats.get("pick_events", 0))
+            - _ratio(stats.get("near_kin", 0), stats.get("pick_events", 0)), 5
+        ),
+        "pick_ledger_sel": round(
+            _ratio(stats.get("pick_ledger_pos", 0), stats.get("pick_events", 0))
+            - _ratio(stats.get("near_ledger_pos", 0), stats.get("pick_events", 0)), 5
+        ),
+        # Havuza karsi olan ham fark: bilgi icin tutulur, KANIT DEGILDIR.
+        "pick_kin_sel_raw": round(
+            _ratio(stats.get("pick_kin", 0), stats.get("pick_events", 0))
+            - _ratio(stats.get("pool_kin", 0), stats.get("pick_pool", 0)), 5
+        ),
         # --- Faz 5: KARSILIKLILIK (defter isaretine kosullu) ---
         # "Bana veren birine ben de verir miyim?" ve misilleme karsiligi.
         # Ham fark KONFOUNDLUDUR: defteri pozitif olan ajan enerji ALMISTIR,

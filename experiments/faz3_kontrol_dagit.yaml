@@ -5,6 +5,8 @@
 run:
   name: faz3_kontrol_dagit
 rules:
+  partner:
+    enabled: false        # Faz 6 mekanigi; bu deney secimsiz kuruldu
   memory:
     enabled: false        # Faz 5 mekanigi; bu deney hafizasiz kuruldu
   attack:

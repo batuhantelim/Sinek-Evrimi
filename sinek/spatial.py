@@ -26,6 +26,40 @@ class SpatialHash:
     def _key(self, x: float, y: float) -> tuple[int, int]:
         return int(x / self.cell) % self.nx, int(y / self.cell) % self.ny
 
+    def candidates(self, agent, radius: float, world, k: int):
+        """radius icindeki EN YAKIN k ajan, mesafeye gore sirali.
+
+        Faz 6 partner secimi icin: ajan yalnizca en yakinla degil, bir ADAY
+        HAVUZU icinden secer. `nearest` bunun k=1 hali gibi gorunur ama sicak
+        yol oldugu icin ayri tutulur — k=1'de liste kurmak bosuna maliyet.
+
+        Beraberlikte kucuk id once gelir (determinizm).
+        """
+        x, y = agent.x, agent.y
+        span = int(math.ceil(radius / self.cell))
+        cx, cy = self._key(x, y)
+        r2 = radius * radius
+        found = []
+        for gy in range(cy - span, cy + span + 1):
+            for gx in range(cx - span, cx + span + 1):
+                if self.toroidal:
+                    key = (gx % self.nx, gy % self.ny)
+                else:
+                    if not (0 <= gx < self.nx and 0 <= gy < self.ny):
+                        continue
+                    key = (gx, gy)
+                for other in self.buckets.get(key, ()):
+                    if other.id == agent.id:
+                        continue
+                    dx, dy = world.delta(x, y, other.x, other.y)
+                    d2 = dx * dx + dy * dy
+                    if d2 <= r2:
+                        found.append((d2, other.id, other))
+        if not found:
+            return []
+        found.sort(key=lambda t: (t[0], t[1]))
+        return [(t[2], t[0]) for t in found[:k]]
+
     def nearest(self, agent, radius: float, world):
         """radius icindeki EN YAKIN ajan (kendisi haric) ya da None.
 
