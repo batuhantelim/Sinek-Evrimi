@@ -15,7 +15,7 @@ pip install pygame                  # opsiyonel: canlı pencere
 ## Çalıştırma
 
 ```bash
-python run.py                       # config.yaml (Faz 4.5) ile koş, PNG kare kaydet
+python run.py                       # config.yaml (Faz 5) ile koş, PNG kare kaydet
 python run.py --viz pygame          # canlı pencere (SPACE duraklat, Q çık)
 python run.py --steps 1000 --viz none
 python run.py --check-determinism
@@ -53,6 +53,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 4 — tanı | Rejim çatalı teşhis edildi; ölçülebilir taban bulundu | ✅ |
 | 4.5 | Ekoloji borcu: paylaşım enerji yaratıyormuş; zincir onarıldı | ✅ |
 | 4.6 | Korunumlu zeminde `r·b > c` aranması: 0/15 koşul eşiği geçti | ✅ |
+| 5 | Karşılıklılık: üç önkoşul sağlandı, yine de evrimleşmedi (0/5) | ✅ |
 | 4 — adım 2 | Melez soyisim, soy-arası matris, gruplar arası rekabet | ⏳ |
 
-Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/) · [docs/faz46/](docs/faz46/)
+Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/) · [docs/faz46/](docs/faz46/) · [docs/faz5/](docs/faz5/)

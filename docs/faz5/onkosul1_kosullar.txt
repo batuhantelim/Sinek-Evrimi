@@ -1,0 +1,40 @@
+TEKRARLI KARSILASMA SONDASI — taban, 4000 adim, seed 42
+========================================================================================
+  populasyon (son)            : 703
+  ajan basina farkli partner  : 11.0
+  partner basina AYRI bulusma : 1.41  (en cok 19)
+  adim-tekrari (SISIRILMIS)   : %95.0
+  EPIZOT-tekrari (asil olcu)  : %29.1
+  >=3 ayri bulusma yasayan    : %50.6 ajan  <- KARSILIKLILIK ZEMINI
+  ayni partnere donus araligi : ort 46 adim, medyan 16  (omur 900)
+
+TEKRARLI KARSILASMA SONDASI — sikisik, 4000 adim, seed 42
+========================================================================================
+  populasyon (son)            : 624
+  ajan basina farkli partner  : 4.6
+  partner basina AYRI bulusma : 1.44  (en cok 13)
+  adim-tekrari (SISIRILMIS)   : %98.5
+  EPIZOT-tekrari (asil olcu)  : %30.6
+  >=3 ayri bulusma yasayan    : %28.4 ajan  <- KARSILIKLILIK ZEMINI
+  ayni partnere donus araligi : ort 41 adim, medyan 17  (omur 900)
+
+TEKRARLI KARSILASMA SONDASI — genis_menzil, 4000 adim, seed 42
+========================================================================================
+  populasyon (son)            : 668
+  ajan basina farkli partner  : 12.6
+  partner basina AYRI bulusma : 1.45  (en cok 15)
+  adim-tekrari (SISIRILMIS)   : %95.7
+  EPIZOT-tekrari (asil olcu)  : %31.2
+  >=3 ayri bulusma yasayan    : %54.3 ajan  <- KARSILIKLILIK ZEMINI
+  ayni partnere donus araligi : ort 41 adim, medyan 16  (omur 900)
+
+TEKRARLI KARSILASMA SONDASI — uzun_omur, 4000 adim, seed 42
+========================================================================================
+  populasyon (son)            : 724
+  ajan basina farkli partner  : 11.2
+  partner basina AYRI bulusma : 1.40  (en cok 12)
+  adim-tekrari (SISIRILMIS)   : %94.9
+  EPIZOT-tekrari (asil olcu)  : %28.4
+  >=3 ayri bulusma yasayan    : %45.4 ajan  <- KARSILIKLILIK ZEMINI
+  ayni partnere donus araligi : ort 52 adim, medyan 16  (omur 1800)
+

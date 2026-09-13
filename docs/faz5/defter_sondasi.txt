@@ -1,0 +1,29 @@
+Faz 5 — DEFTER KANALI SONDASI (tools/kin_probe.py --channel partner_ledger)
+Ayni sensor vektoru iki kez; YALNIZCA defterin isareti cevriliyor.
+fark = ort(motor | 'bana VERDI') - ort(motor | 'bana SALDIRDI')
+
+### seed 1
+  kayit                           genom |  PAYLAS fark  kayiran |  SALDIR fark  kayiran
+  f5_hafizali_s1                    679 |      +0.1001    88.4% |      -0.0364    44.9%
+  f5_defter_s1                      698 |      +0.0818    82.4% |      +0.0378    56.7%
+
+### seed 7
+  kayit                           genom |  PAYLAS fark  kayiran |  SALDIR fark  kayiran
+  f5_hafizali_s7                    795 |      -0.0172    33.3% |      -0.1196    33.8%
+  f5_defter_s7                      685 |      +0.0259    63.4% |      +0.1048    60.6%
+
+### seed 42
+  kayit                           genom |  PAYLAS fark  kayiran |  SALDIR fark  kayiran
+  f5_hafizali_s42                   689 |      +0.0830    76.2% |      +0.0972    60.8%
+  f5_defter_s42                     708 |      +0.0326    66.2% |      +0.0049    49.4%
+
+### seed 123
+  kayit                           genom |  PAYLAS fark  kayiran |  SALDIR fark  kayiran
+  f5_hafizali_s123                  766 |      -0.0321    36.2% |      +0.0325    54.6%
+  f5_defter_s123                    688 |      -0.0157    43.8% |      -0.2395    19.0%
+
+### seed 777
+  kayit                           genom |  PAYLAS fark  kayiran |  SALDIR fark  kayiran
+  f5_hafizali_s777                  734 |      +0.0554    71.4% |      -0.0667    38.4%
+  f5_defter_s777                    700 |      +0.0261    64.6% |      -0.0309    45.1%
+

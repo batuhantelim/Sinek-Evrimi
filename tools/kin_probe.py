@@ -33,7 +33,8 @@ from sinek.persistence import load_population  # noqa: E402
 SETTLE = 6  # recurrent durumun oturmasi icin tekrar sayisi
 
 
-def probe(genomes, cfg, samples: int = 200, seed: int = 0) -> dict:
+def probe(genomes, cfg, samples: int = 200, seed: int = 0,
+          channel: str = "kin", values=(1.0, -1.0)) -> dict:
     rng = np.random.default_rng(seed)
     # Ortak sensor havuzu: her genom AYNI girdileri gorur.
     base = rng.uniform(-1.0, 1.0, size=(samples, N_SENSORS)).astype(np.float32)
@@ -41,26 +42,29 @@ def probe(genomes, cfg, samples: int = 200, seed: int = 0) -> dict:
     for name in ("energy", "age", "food_here", "food_strength", "hazard_near", "crowd",
                  "neighbor_need"):
         base[:, S[name]] = rng.uniform(0.0, 1.0, samples)  # bu kanallar 0..1
-    # Komsu HER IKI kosulda da var: tek degisen akrabalik olsun.
+    # Komsu HER IKI kosulda da var: tek degisen `channel` olsun.
     base[:, S["near_agent"]] = 1.0
+    if channel == "partner_ledger":
+        # Faz 5: partner TANINIYOR olsun; tek degisen defterin ISARETI olsun.
+        base[:, S["partner_known"]] = 1.0
 
     motors = [m for m in ("share", "attack") if m in M]
     diffs: dict[str, list[float]] = {m: [] for m in motors}
     for genome in genomes:
         brain = make_brain(cfg, genome)
         outs = {}
-        for kin_value in (1.0, -1.0):
+        for kin_value in values:
             vals = []
             for row in base:
                 s = row.copy()
-                s[S["kin"]] = kin_value
+                s[S[channel]] = kin_value
                 brain.reset()
                 out = None
                 for _ in range(SETTLE):  # ayni girdiyi tekrarlayip durumu oturt
                     out = brain.act(s, rng)
                 vals.append([float(out[M[m]]) for m in motors])
             outs[kin_value] = np.array(vals)
-        delta = (outs[1.0] - outs[-1.0]).mean(axis=0)
+        delta = (outs[values[0]] - outs[values[1]]).mean(axis=0)
         for i, m in enumerate(motors):
             diffs[m].append(float(delta[i]))
 
@@ -81,11 +85,18 @@ def main(argv=None) -> int:
     ap.add_argument("--samples", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--set", dest="overrides", action="append", default=[])
+    ap.add_argument(
+        "--channel", default="kin",
+        help="hangi kanal cevrilsin: kin (varsayilan) | partner_ledger (Faz 5)",
+    )
     args = ap.parse_args(argv)
 
     cfg = load_config(overrides=args.overrides)
-    print("Sonda: ayni sensor vektoru, yalnizca akrabalik kanali degisiyor.")
-    print("       fark = ortalama(motor | akraba) - ortalama(motor | yabanci)")
+    etiket = {"kin": ("akrabalik", "akraba", "yabanci"),
+              "partner_ledger": ("defter", "bana VERDI", "bana SALDIRDI")}
+    ad, poz, neg = etiket.get(args.channel, (args.channel, "+1", "-1"))
+    print(f"Sonda: ayni sensor vektoru, yalnizca {ad} kanali degisiyor.")
+    print(f"       fark = ortalama(motor | {poz}) - ortalama(motor | {neg})")
     print(f"       {args.samples} sensor ornegi x genom basina\n")
     print(
         f"  {'kayit':30s} {'genom':>6} | {'PAYLAS fark':>12} {'kayiran':>8} "
@@ -93,7 +104,7 @@ def main(argv=None) -> int:
     )
     for path in args.populations:
         genomes, _meta = load_population(path, cfg)
-        r = probe(genomes, cfg, args.samples, args.seed)
+        r = probe(genomes, cfg, args.samples, args.seed, args.channel)
         label = os.path.basename(os.path.dirname(path)) or path
         sh = r.get("share", {"mean": 0.0, "pos_frac": 0.0})
         at = r.get("attack")
@@ -101,7 +112,7 @@ def main(argv=None) -> int:
         if at:
             line += f" | {at['mean']:+12.4f} {at['pos_frac'] * 100:7.1f}%"
         print(line)
-    print("\n  fark ~0 ve kayiran ~%50 ise beyin akrabalik kanalini OKUMUYOR demektir.")
+    print(f"\n  fark ~0 ve kayiran ~%50 ise beyin {ad} kanalini OKUMUYOR demektir.")
     print("  Parochial imza: PAYLAS farki POZITIF (akrabaya cok) ve")
     print("                  SALDIR farki NEGATIF (akrabaya az) olmali.")
     return 0

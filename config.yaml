@@ -237,9 +237,16 @@ rules:
     decay: 0.0            # adim basina unutma orani (0 = omur boyu hatirlar)
     # KONTROL:
     #   none             : normal kosum
-    #   shuffle_identity : tanima kimlikleri her adim karistirilir -> defter
-    #                      YANLIS bireyi gosterir. Gecmis anlamsizsa
-    #                      karsiliklilik cokmelidir.
+    #   shuffle_ledger   : ASIL KONTROL. Her ajanin defterindeki DEGERLER kendi
+    #                      partnerleri arasinda karistirilir. Ornek buyuklugu
+    #                      AYNEN korunur (ayni sayida partner, ayni degerler);
+    #                      yalnizca "hangi partner hangi degere sahip" bilgisi
+    #                      yok olur. Karsiliklilik burada COKMELI.
+    #   shuffle_identity : daha sert ama KUSURLU kontrol: tanima kimlikleri
+    #                      karistirilir, boylece defterde kayitli birine
+    #                      rastlama olasiligi da cokuyor (olculdu: pozitif
+    #                      firsat 17751 -> 417). Bilgi mi ornek mi kayboldu
+    #                      ayirt edilemez; yalnizca ikincil kontrol olarak.
     control: none
 
   predator:

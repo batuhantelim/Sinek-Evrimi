@@ -114,7 +114,7 @@ class Simulation:
         self.memory_capacity = max(1, int(cfg.get("rules.memory.capacity", 16)))
         self.memory_decay = float(cfg.get("rules.memory.decay", 0.0))
         self.memory_control = str(cfg.get("rules.memory.control", "none"))
-        if self.memory_control not in ("none", "shuffle_identity"):
+        if self.memory_control not in ("none", "shuffle_ledger", "shuffle_identity"):
             raise ValueError(f"bilinmeyen rules.memory.control={self.memory_control!r}")
 
         self.founder = founder_genome(cfg, self.rng)
@@ -206,7 +206,9 @@ class Simulation:
             self.hash.build(self.agents)
             if self.kin_control == "shuffle_surnames":
                 self._shuffle_surnames()
-            if self.memory_control == "shuffle_identity":
+            if self.memory_control == "shuffle_ledger":
+                self._shuffle_ledgers()
+            elif self.memory_control == "shuffle_identity":
                 self._shuffle_identities()
             for a in self.agents:
                 a.nearest = self.hash.nearest(a, self.kin_radius, self.world)
@@ -681,6 +683,32 @@ class Simulation:
         order = self.rng.permutation(len(names))
         for a, idx in zip(self.agents, order):
             a.genome.surname = names[int(idx)]
+
+    def _shuffle_ledgers(self) -> None:
+        """KONTROL (ASIL): her ajanin defterindeki DEGERLERI kendi partnerleri
+        arasinda karistirir.
+
+        Neden bu, `shuffle_identity`'den daha iyi bir kontrol: kimlikleri
+        karistirmak, defterde kayitli bir bireye rastlama olasiligini da yok
+        eder (olculdu: defteri pozitif firsat 17751 -> 417, 43x kucuk ornek).
+        O zaman "bilgi yok oldugu icin mi, ornek kalmadigi icin mi" ayirt
+        edilemez — Faz 3'te `random_surname_at_birth`'un ilk surumunde yapilan
+        hatanin aynisi.
+
+        Buradaki karistirma ORNEKLEMI AYNEN KORUR: ajan yine ayni sayida
+        partneri taniyor, defterinde yine ayni degerler var; yalnizca HANGI
+        partnerin hangi degere sahip oldugu bilgisizlesir. `partner_known`
+        degismez, yalnizca `partner_ledger` anlamsizlasir.
+        """
+        for a in self.agents:
+            led = a.ledger
+            if len(led) < 2:
+                continue
+            keys = list(led)
+            vals = [led[k] for k in keys]
+            order = self.rng.permutation(len(vals))
+            for k, idx in zip(keys, order):
+                led[k] = vals[int(idx)]
 
     def _shuffle_identities(self) -> None:
         """KONTROL: TANIMA kimliklerini yasayanlar arasinda karistirir.

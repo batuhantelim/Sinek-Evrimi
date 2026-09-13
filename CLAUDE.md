@@ -40,6 +40,7 @@ davranış oradan **türer**.
 | **Faz 4 — tanı** | Rejim çatalı: gerçek ama havzalar eşit değil; ölçülebilir taban bulundu | ✅ **tamam** |
 | **Faz 4.5** | Ekoloji borcu: paylaşım enerji yaratıyordu; zincir onarıldı, Faz 3 sonucu tekrarlanmadı | ✅ **tamam** |
 | **Faz 4.6** | Korunumlu zeminde `r·b > c` araması: 15 koşulun hiçbiri eşiği geçmedi | ✅ **tamam** |
+| **Faz 5** | Karşılıklılık: üç önkoşul sağlandı, yine de evrimleşmedi (0/5) | ✅ **tamam** |
 | **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 4).
@@ -86,6 +87,7 @@ tools/basin_map.py      Rejim havzası haritalama (eşik veriden türetilir)
 tools/surplus_probe.py  Paylaşım verici enerji katmanına göre: fazlalık mı, maliyet mi?
 tools/selection_probe.py  Enerji → üreme → seçilim zinciri sağlıklı mı (tamamlanmış yaşamlar)
 tools/hamilton_probe.py   Hamilton'un b ve c'sini YAVRU cinsinden ölçer (varsaymaz)
+tools/encounter_probe.py  Tekrarlı karşılaşma: EPİZOT mu, uzun bitişiklik mi?
 tests/                  unittest — determinizm + faz testleri + araç/yöntem testleri
 ```
 
@@ -94,7 +96,7 @@ tests/                  unittest — determinizm + faz testleri + araç/yöntem 
 Beden ile beyin arasındaki **tek** bağ iki vektördür:
 
 ```
-sensors (19 float) ──► Brain.act() ──► motors (5 float)
+sensors (21 float) ──► Brain.act() ──► motors (5 float)
 ```
 
 ```python
@@ -102,7 +104,8 @@ SENSOR_NAMES = [bias, energy, age, food_here, food_fwd, food_left,
                 food_strength, hazard_fwd, hazard_left, hazard_near,
                 mate_fwd, mate_left, crowd,
                 kin, near_agent, neighbor_need,     # Faz 3
-                pred_fwd, pred_left, pred_near]     # Faz 4
+                pred_fwd, pred_left, pred_near,     # Faz 4
+                partner_known, partner_ledger]      # Faz 5
 MOTOR_NAMES  = [turn, thrust, eat, share, attack]   # Faz 3
 ```
 
@@ -601,6 +604,73 @@ bulgusu farklı bir koşulda tekrarlandı.
 
 ---
 
+## 3.10 Faz 5: tanıma, hafıza ve karşılıklılık
+
+Tam rapor: **[docs/faz5/karsiliklilik.md](docs/faz5/karsiliklilik.md)**
+
+### Üç önkoşul ÖNCE garanti edilir
+
+Karşılıklılık (Axelrod) tekrarlı karşılaşma + tanıma + hafıza ister. Üçü
+olmadan "karşılıklılık reddedildi" denemez; doğru cümle "koşul yoktu"dur.
+
+**⚠ Epizot ≠ adım.** Bir sinek 100 adım aynı komşunun yanında durursa bu **tek**
+karşılaşmadır. `tools/encounter_probe.py` ikisini ayırır: taban ekolojide
+adım-tekrarı %95.0 (şişirilmiş) ama epizot-tekrarı %29.1, ajanların **%50.6**'sı
+aynı bireyle ≥3 **ayrı** buluşma yaşıyor (ölçüt %30) — zemin var, ekolojiyi
+değiştirmeye gerek kalmadı. Mekânı sıkıştırmak zemini **düşürüyor** (%28.4):
+uzun bitişiklik epizot değildir.
+
+### Mekanik: kapasite verilir, kural verilmez
+
+`Agent.ledger` — partner kimliği → geçmişin net işareti. **Alıcı** kaydeder
+(enerji aldıysa `+`, saldırı yediyse `−`); kapasite 16, tahliye deterministik.
+İki yeni sensör: `partner_known`, `partner_ledger`.
+
+**"Karşılık ver" diye bir kural YOKTUR.**
+`tests/test_phase5.py::test_memory_is_information_not_rule` kaynakta defter
+bayraklarının (`owes`/`grudge`) yalnızca ölçüm sayaçlarına gittiğini, hiçbir
+karar dalına girmediğini denetler.
+
+### ⚠ Kontrol tasarımı: örneklemi yok eden kontrol geçersizdir
+
+İlk kontrolüm `shuffle_identity` idi (tanıma kimlikleri karışır). Ölçüldüğünde
+defteri pozitif fırsat **17 751 → 417** (43× küçük): bilgi mi örnek mi
+kayboldu ayırt edilemez. Faz 3'te `random_surname_at_birth`'ün ilk sürümündeki
+hatanın aynısı.
+
+**Asıl kontrol `shuffle_ledger`**: değerler ajanın **kendi** partnerleri
+arasında karıştırılır. Aynı sayıda partner, aynı değerler; yalnızca "hangi
+partner hangi değere sahip" bilgisi gider. Örneklem korunur (%6.4–10.5 vs
+%4.3–10.8).
+
+### Sonuç: karşılıklılık evrimleşmedi
+
+5 seed, her biri kendi eşleşmiş kontrolüyle:
+
+| ölçü | sonuç |
+|---|---|
+| karşılıklılık ayrıştı | **0/5** (`t` = −0.94 ± 1.56; iki seed'de kontrol daha yüksek) |
+| misilleme ayrıştı | **1/5** (ölçüt ≥4/5) |
+| enerji korunumu | 10/10 koşumda tam |
+
+**Misilleme görüntüsü tamamen konfound**: hafızalı kolda `retal_bias_adj`
++4.3…+8.0 puan, ama kontrolde de +4.3…+6.9. Sıfıra karşı okunsaydı yanlış
+pozitif raporlanacaktı.
+
+**Kanal tutarlı biçimde okunmuyor**: nedensel sonda hafızalı kolda +0.038
+(3/5 pozitif), kontrolde +0.030 (4/5). ⚠ Yalnızca seed 42'ye bakılsaydı
+(+0.083 vs +0.033) "kanal okunuyor" denecekti.
+
+### İki negatif bağımsız olmayabilir (hipotez)
+
+Paylaşımın taban oranı ~%1. Karşılıklılığın seçilebilmesi için önce
+**paylaşımın kendisinin** yeterince sık olması, yani "bana veren" diye bir
+sınıfın oluşması gerekir. Faz 4.6 paylaşımın neden bu kadar nadir olduğunu
+gösterdi (`r·b/c < 1`). Yani karşılıklılık, **üzerine kurulacağı işbirliği
+olmadığı için** başlayamıyor olabilir. Ölçülmedi.
+
+---
+
 ## 4. Nasıl çalıştırılır
 
 ```bash
@@ -611,7 +681,7 @@ python run.py --steps 2000 --viz none    # sadece metrik, en hızlısı
 python run.py --viz pygame               # canlı pencere (SPACE: duraklat, Q: çık)
 python run.py --seed 7 --name deney7
 python run.py --check-determinism
-python -m unittest discover -s tests     # 107 test
+python -m unittest discover -s tests     # 123 test
 ```
 
 Hazır deneyler (`experiments/README.md`):
@@ -642,6 +712,19 @@ python run.py --config experiments/faz45_ekoloji.yaml \
 python tools/selection_probe.py --steps 8000   # enerji -> ureme -> secilim
 python tools/hamilton_probe.py --steps 8000 \
   --set agents.motors.max_speed=0.05 --set rules.share.overhead=0.0   # r, b, c
+```
+
+Faz 5 (tanıma + hafıza; karşılıklılık ölçümü):
+
+```bash
+python tools/encounter_probe.py --steps 4000            # önkoşul 1: EPİZOT tekrarı
+python run.py --config experiments/faz5_hafiza.yaml \
+  --load-genomes docs/faz45/population_ekoloji.npz --seed 42
+# ASIL kontrol — örneklemi korur, yalnızca bilgiyi siler:
+python run.py --config experiments/faz5_hafiza.yaml --seed 42 --viz none \
+  --set rules.memory.control=shuffle_ledger --name f5_kontrol
+python tools/kin_probe.py runs/f5_kontrol/population.npz \
+  --channel partner_ledger --set rules.memory.enabled=true
 ```
 
 Faz 4'ün 2×2'si (dört kol da Faz 2 tohumuyla, her biri kendi kontrolüyle):
@@ -737,6 +820,9 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `energy_created` | paylaşımın yarattığı/yok ettiği net enerji — korunumlu modda **tam 0** |
 | `genetic_r`, `genetic_r_pairs` | Hamilton'un `r`'si: aktör–komşu **genom** benzerliği (etiket değil) |
 | `bc_ratio_fit` | `need_bonus` çarpanlı `b/c` **tahmini** — bir varsayım, kanıt değil |
+| `recip_bias`, `recip_bias_adj` | karşılıklılık: `P(paylaş \| defter +)` − `P(paylaş \| defter ≤0)` (ham / enerji katmanlı) |
+| `retal_bias_adj` | misilleme: `P(saldır \| defter −)` − `P(saldır \| defter ≥0)`, katmanlı |
+| `opp_ledger_pos/neg`, `ledger_pos_share` | defter örneklem büyüklükleri (küçükse oran gürültüdür) |
 | `repro_blocked`, `at_cap` | tavan yüzünden yanan üreme hakkı / popülasyon tavana değdi mi |
 | `gp_<parametre>` | her genom parametresinin popülasyon ortalaması — evrimin **yönü** |
 | `cooperation_rate` | Faz 3 için ayrılmış |
@@ -1017,6 +1103,26 @@ Tam tablo: **[docs/faz46/hamilton_arayisi.md](docs/faz46/hamilton_arayisi.md)**
 - Yan bulgu: saldırı 5/5 seed'de yabancıya yöneliyor (`atk_t` −6.7…−14.7).
   Korunumlu zeminde düşmanlık ayrım gözetiyor, fedakârlık gözetmiyor.
 
+### Faz 5 — karşılıklılık (4 önkoşul koşulu + 5 seed × 2 kol + sonda)
+
+Tam tablo: **[docs/faz5/karsiliklilik.md](docs/faz5/karsiliklilik.md)**
+
+- **Üç önkoşul da ölçülerek sağlandı.** Tekrarlı karşılaşma: ajanların %50.6'sı
+  aynı bireyle ≥3 **ayrı** buluşma (ölçüt %30), dönüş aralığı medyan 16 adım.
+  Tanıma: iki yeni sensör. Hafıza: RNN iç durumu zaten kalıcı + dışsal defter.
+- **Karşılıklılık EVRİMLEŞMEDİ: 0/5 seed** kontrolden ayrıştı (`t` = −0.94 ± 1.56).
+  İki seed'de kontrol asıl koldan daha yüksek.
+- **Misilleme 1/5** (ölçüt ≥4/5). Görünen +4.3…+8.0 puanlık "bana saldırana
+  saldırırım" tamamen konfound: kontrol de +4.3…+6.9 veriyor.
+- **Defter kanalı tutarlı okunmuyor**: sonda hafızalı +0.038 (3/5 pozitif),
+  kontrol +0.030 (4/5). Tek seed'e bakılsaydı ters okunurdu.
+- **⚠ Kontrol tasarımı dersi:** ilk kontrol (`shuffle_identity`) örneklemi yok
+  ediyordu (defteri pozitif fırsat 17 751 → 417). Asıl kontrol
+  `shuffle_ledger` örneklemi korur, yalnızca bilgiyi siler.
+- **⚠ Epizot ≠ adım**: adım-tekrarı %95.0 ama epizot-tekrarı %29.1. Uzun
+  bitişiklik tekrarlı karşılaşma değildir; sıkışık mekân zemini düşürüyor.
+- Enerji korunumu 10/10 koşumda tam.
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -1063,15 +1169,21 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
    **yeni bir kanal** gerekir: misilleme/hafıza, itibar, tekrarlı etkileşim,
    kısmi akrabalık (melez soyisim) veya grup seçilimi. Bunlardan biri
    eklenmeden fedakârlık beklenmemeli.
-5. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
+5. ✅ **Karşılıklılık da elendi (§3.10).** Üç önkoşul ölçülerek sağlandı,
+   yine de 0/5. İki negatif bağımsız olmayabilir: karşılıklılık, üzerine
+   kurulacağı işbirliği (~%1 paylaşım) olmadığı için başlayamıyor olabilir.
+   Sınamak için paylaşımı **ödüllendirmeden** dışarıdan yükseltip
+   karşılıklılığın o zaman çıkıp çıkmadığına bakmak gerekir.
+6. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
    etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
    etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
    değiştirmek bu kodu bozmaz — kısmi akrabalık isteniyorsa
    `agent.sense`'teki `kin` hesabı sürekli bir orana çevrilir.
-6. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
+7. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
    `(soy_i, soy_j)` matrisine genişletilecek. `stratified_kin_bias`
    `action` parametresiyle zaten genel; hücre başına da uygulanabilir.
-7. Adım 2 tohumu: `docs/faz45/population_ekoloji.npz` (temiz ekoloji).
+8. Adım 2 tohumu: `docs/faz5/population_hafiza.npz` (hafızalı) ya da
+   `docs/faz45/population_ekoloji.npz` (hafızasız temiz ekoloji).
    Eski zeminin tabanı `docs/faz4tani/population_taban.npz`, Faz 4 adım 1'in
    avcılı kazananları `docs/faz4/population.npz`.
 
@@ -1187,4 +1299,12 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
 - **Eşiğe yaklaşırken ölçülebilirliği kaybetmeyin.** `r·b/c` 0.989'a çıkan
   koşul dış-grup fırsat payını %3'e düşürdü; o kol okunmaz. Her taramada
   ölçülebilirlik şartını da denetleyin.
+- **Kontrol ÖRNEKLEMİ değil BİLGİYİ silmelidir.** `shuffle_identity` defteri
+  pozitif fırsatı 17 751'den 417'ye düşürüyordu; o kontrole karşı okunan hiçbir
+  oran yorumlanamaz. `shuffle_ledger` aynı sayıda partneri ve aynı değerleri
+  bırakıp yalnızca eşleşmeyi bozar. Yeni bir kontrol yazarken **örneklem
+  büyüklüğünü iki kolda da ölçüp karşılaştırın**.
+- **Tekrarlı karşılaşmada EPİZOT sayın, adım değil.** Aynı komşunun yanında
+  100 adım durmak tek karşılaşmadır. Adım-tekrarı %95 iken epizot-tekrarı
+  %29'du; mekânı sıkıştırmak zemini yükseltmiyor, **düşürüyor**.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.

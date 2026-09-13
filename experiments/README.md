@@ -2,7 +2,7 @@
 
 Her dosya `config.yaml` uzerine bindirilir; sadece degistirdigi anahtarlari
 icerir. `config.yaml` her zaman **en guncel fazin** varsayilanini tasir
-(su an Faz 4), onceki fazlar buradan yeniden uretilir. Faz 1/2/3 dosyalari
+(su an Faz 5), onceki fazlar buradan yeniden uretilir. Faz 1/2/3 dosyalari
 `rules.predator.enabled: false` tasir: varsayilan ilerledi diye eski bir
 deney sessizce baska bir deneye donusmemeli.
 
@@ -29,6 +29,7 @@ python run.py --config experiments/<dosya>.yaml
 | `faz4_avcisiz_kontrol.yaml` | Avcisiz karistirma kontrolu |
 | `faz4_taban.yaml` | **Faz 4 olculebilir taban** — rejim ayni, TOHUM farkli (zorunlu) |
 | `faz45_ekoloji.yaml` | **Faz 4.5 TEMIZ EKOLOJI** — korunumlu paylasim + baglayici olmayan tavan |
+| `faz5_hafiza.yaml` | **Faz 5** — tanima + hafiza kanali (karsiliklilik olcumu) |
 
 Tek seferlik degisiklikler icin dosya acmaya gerek yok:
 

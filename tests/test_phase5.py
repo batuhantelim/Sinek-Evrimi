@@ -114,22 +114,36 @@ class TestExperimentValidity(unittest.TestCase):
     def test_memory_is_information_not_rule(self):
         """KURAL: "karsilik ver" davranisi KODLANMAZ.
 
-        Kaynakta, defteri okuyup paylasim/saldiri kararini DOGRUDAN degistiren
-        bir dal olmamali. Defter yalnizca (a) sensore, (b) olcum sayaclarina
-        gider. Karar her zaman `last_motors` uzerinden, yani BEYINDEN gelir.
+        Defterden turetilen `owes` / `grudge` bayraklari YALNIZCA olcum
+        sayaclarina gidebilir. Bir `if` icinde paylasim/saldiri kararini
+        yonlendirirlerse davranisi biz kodlamis oluruz ve "karsiliklilik
+        evrimlesti" bulgusu degersizlesir.
         """
         path = os.path.join(os.path.dirname(__file__), "..", "sinek", "simulation.py")
         with open(path, encoding="utf-8") as fh:
-            src = fh.read()
-        for line in src.splitlines():
-            stripped = line.strip()
-            if "ledger" not in stripped or stripped.startswith("#"):
+            lines = fh.read().splitlines()
+        for line in lines:
+            t = line.strip()
+            if t.startswith("#") or not t:
                 continue
-            # Izin verilenler: defteri yazmak, firsat siniflandirmak.
-            ok = ("led[key]" in stripped or "led.get" in stripped
-                  or "owner.ledger" in stripped or "a.ledger.get" in stripped
-                  or "len(led)" in stripped or "= led" in stripped)
-            self.assertTrue(ok, f"defter karara dogrudan karisiyor olabilir: {stripped!r}")
+            if "owes" not in t and "grudge" not in t:
+                continue
+            allowed = (
+                t.startswith("owes =") or t.startswith("grudge =")      # turetme
+                or t.startswith("stats[")                               # olcum
+                or t.startswith("atk_floor, grudge")                    # _do_attack argumani
+                or t.startswith("def _do_attack")                       # imza
+                or "grudge: bool" in t
+            )
+            self.assertTrue(allowed, f"defter bayragi karara karisiyor: {t!r}")
+        # Karar her zaman motorlardan gelmeli.
+        body = "\n".join(lines)
+        decision = body.split("share_margin = share_urge - threshold")[1].split("def ")[0]
+        for flag in ("owes", "grudge"):
+            for t in decision.splitlines():
+                t = t.strip()
+                if t.startswith("if ") and flag in t:
+                    self.fail(f"karar dali defteri okuyor: {t!r}")
 
     def test_fitness_has_no_memory_term(self):
         cfg = load_config()
@@ -150,6 +164,22 @@ class TestExperimentValidity(unittest.TestCase):
     def test_unknown_memory_control_fails_loudly(self):
         with self.assertRaises(ValueError):
             make(rules__memory__control="sihirli")
+
+    def test_shuffle_ledger_keeps_the_sample_and_kills_the_information(self):
+        """ASIL KONTROL: ornek buyuklugu korunur, bilgi yok olur."""
+        sim = make(agents__initial_count=40, rules__memory__enabled=True,
+                   extra=["rules.memory.control=shuffle_ledger"])
+        a = sim.agents[0]
+        a.ledger.update({101: 5.0, 102: -3.0, 103: 8.0, 104: -1.0})
+        before_keys, before_vals = set(a.ledger), sorted(a.ledger.values())
+        changed = False
+        for _ in range(8):
+            sim._shuffle_ledgers()
+            if [a.ledger[k] for k in (101, 102, 103, 104)] != [5.0, -3.0, 8.0, -1.0]:
+                changed = True
+        self.assertEqual(set(a.ledger), before_keys, "taninan partner kumesi korunmali")
+        self.assertEqual(sorted(a.ledger.values()), before_vals, "deger dagilimi korunmali")
+        self.assertTrue(changed, "hicbir deger yer degistirmemis")
 
     def test_shuffle_identity_permutes_mem_id_but_not_id(self):
         sim = make(agents__initial_count=60, rules__memory__enabled=True,
