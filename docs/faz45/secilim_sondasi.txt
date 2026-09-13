@@ -1,0 +1,21 @@
+================================================================================================
+SECILIM ZINCIRI SONDASI — 8000 adim, seed 42, tamamlanmis yasamlar
+================================================================================================
+  olcum                               eski (tavan + enerji pompasi   yeni (cevresel + korunumlu)
+  tamamlanmis yasam (n)                                       7107                         11368
+  son populasyon                                               700                           764
+  adim basina yanan ureme hakki                              421.9                           0.0
+  adim basina YARATILAN enerji                               207.7                           0.0
+  ortalama yavru                                              1.17                          1.18
+  hic uremeyenlerin payi                                     67.1%                         43.8%
+  yemek -> yavru  (ham r)                                   +0.317                        +0.692
+  yemek -> yavru  (YAS kontrollu)                           +0.047                        +0.738
+  egim (yavru / yemek birimi)                               0.0531                        0.0778
+  paylasan ajan payi                                         96.1%                         83.0%
+  VERMEK -> yavru (yalniz yas kontrollu)                        +0.096                        +0.143
+  VERMEK -> yavru (yas+YEMEK kontrollu)                        +0.114                        -0.080
+  ALMAK  -> yavru (yas+YEMEK kontrollu)                        +0.437                        +0.319
+
+  YORUM: yas kontrollu 'yemek -> yavru' bagi +0.047 -> +0.738
+         Zincir saglikliysa bu bag POZITIF ve belirgin olmali: cok toplayan
+         cok urer. Tavan bagliyorken ureme bir slot kuyrugudur ve bag zayiflar.

@@ -38,6 +38,7 @@ davranış oradan **türer**.
 | **Faz 3 — eksen B** | Kıtlık saldırıyı hiç artırmadı; H2 de reddedildi | ✅ **tamam** |
 | **Faz 4 — adım 1** | Doğal avcı (grup-kör); düşmanlık da sürü işbirliği de çıkmadı | ✅ **tamam** |
 | **Faz 4 — tanı** | Rejim çatalı: gerçek ama havzalar eşit değil; ölçülebilir taban bulundu | ✅ **tamam** |
+| **Faz 4.5** | Ekoloji borcu: paylaşım enerji yaratıyordu; zincir onarıldı, Faz 3 sonucu tekrarlanmadı | ✅ **tamam** |
 | **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 4).
@@ -82,6 +83,7 @@ tools/env_sweep.py      Çevresel tarama (eksen A: dış-grup bolluğu, eksen B:
 tools/predator_sweep.py Faz 4 avcı 2×2 taraması + D/Ç sınıflandırması
 tools/basin_map.py      Rejim havzası haritalama (eşik veriden türetilir)
 tools/surplus_probe.py  Paylaşım verici enerji katmanına göre: fazlalık mı, maliyet mi?
+tools/selection_probe.py  Enerji → üreme → seçilim zinciri sağlıklı mı (tamamlanmış yaşamlar)
 tests/                  unittest — determinizm + faz testleri + araç/yöntem testleri
 ```
 
@@ -307,13 +309,31 @@ olan bir alıcı. İki ekleme bunu erişilebilir kıldı:
 - **`neighbor_need` sensörü** — beyin komşusunun açlığını göremiyordu, o anı
   hedefleyemiyordu. Bilgi kanalı, ödül değil.
 - **`rules.share.need_bonus`** — aynı kalorinin aç bir alıcıya daha değerli
-  olması (alıcının dönüşüm verimi). Verene hiçbir şey kazandırmaz;
-  "paylaşım ödüllendirilmez" kuralı korunur. `0.0` = doğrusal (adım 1 davranışı).
+  olması (alıcının dönüşüm verimi). `0.0` = doğrusal (adım 1 davranışı).
 
 Sonuç: `b/c` 0.73 → 1.16, paylaşım oranı %2.09 → %6.02, kontrolden ayrıştı
-(t = +2.48). **Yeni bir sosyal kural eklerken önce `r·b/c`'nin 1'i
-geçebildiğini doğrulayın**, yoksa negatif sonuç mekanizmadan değil
-muhasebeden gelir.
+(t = +2.48).
+
+### ⚠⚠ DÜZELTME (Faz 4.5): bu "kaçış" enerji üretimiydi
+
+`need_bonus` **alıcıya vericinin kaybettiğinden 4 kata kadar fazla gerçek
+enerji** veriyordu: `taken = min(amount·(1+need_bonus·need), boşluk)` ve veren
+yalnızca `amount + overhead` ödüyordu. Yani paylaşım **korunumlu değildi** ve
+her transfer koloniye net enerji **ekliyordu**. Ölçüldü: %90 işbirliği olan bir
+koşumda üretilen enerji yenen yemeğe eşit, %97'de 3.2 katı
+([docs/faz45/](docs/faz45/ekoloji_borcu.md)).
+
+Artık `rules.share.need_mode` var:
+
+| mod | davranış |
+|---|---|
+| **`fitness`** (varsayılan) | **KORUNUMLU**: alıcı en fazla aktarılanı alır; çarpan yalnızca muhasebedeki `b`'ye girer. Dinamiği hiç değiştirmez — yani `b/c ≤ 1` tavanı geri gelir |
+| `energy` | eski davranış. Faz 3 adım 1.5 – Faz 4 tanısı arası her şey bu modda üretildi; deney dosyalarına açıkça pinlendi |
+
+`energy_created` sayacı korunumlu modda tam 0'dır
+(`test_sharing_conserves_energy_by_default`). **Yeni bir sosyal kural eklerken
+önce enerji defterinin tuttuğunu doğrulayın**; `r·b/c`'nin 1'i geçip geçmediği
+ancak ondan sonra anlamlı bir sorudur.
 
 ### Saldırı (`rules.attack`)
 
@@ -463,6 +483,72 @@ Bir müdahale eklendiğinde ölçüt **yeniden** denetlenmelidir.
 
 ---
 
+## 3.8 Faz 4.5: ekoloji borcu ve seçilim zincirinin onarımı
+
+Tam rapor: **[docs/faz45/ekoloji_borcu.md](docs/faz45/ekoloji_borcu.md)**
+
+### Paylaşım korunumlu değildi (§3.5'teki düzeltme)
+
+`need_bonus` alıcıya gerçek fazladan enerji veriyordu. Pompanın büyüklüğü
+işbirliğiyle birlikte büyüyor: %4 işbirliğinde üretilen enerji yenen yemeğin
+%7'si, %90'da %96'sı, %97'de %321'i. Tanının "kaçak havza"sının (yumak)
+mekanizması budur; sınırsız bir iç enerji kaynağı varken çevre bağlayıcı
+olamaz.
+
+### Bölüm 1 — çevre artık sınırlıyor
+
+İki yapısal değişiklik: korunumlu paylaşım (`need_mode: fitness`) ve
+`max_count: 5000` (bağlayıcı değil). **Yemek arzı değişmedi.**
+
+| | eski | yeni |
+|---|---|---|
+| tavanda geçen adım | %99.4 | **%0.0** |
+| adım başına yanan üreme hakkı | ~456 | **0** |
+| denge popülasyonu | 700 (tavan) | **~750 (çevre)** |
+
+N yemek arzına doğru orantılı yanıt veriyor (×0.25 → 215, ×0.40 → 337,
+×0.60 → 450, ×1.00 → 750): çevresel sınırlamanın doz-yanıt kanıtı. 5/5 seed
+ölçütü geçti.
+
+### Bölüm 2 — zincir gerçekten kırıkmış
+
+`tools/selection_probe.py` tamamlanmış yaşamları toplar. **Yaş kontrol
+edilmeden okunamaz**: yaşlı ajan hem çok yer hem çok ürer.
+
+| ölçüm | eski | yeni |
+|---|---|---|
+| yemek → yavru (ham) | +0.317 | +0.692 |
+| **yemek → yavru (yaş kontrollü)** | **+0.047** | **+0.738** |
+| hiç üremeyen yetişkin | %67.1 | %43.8 |
+| **VERMEK → yavru (yaş + YEMEK kontrollü)** | **+0.114** | **−0.080** |
+| ALMAK → yavru (yaş + yemek kontrollü) | +0.437 | +0.319 |
+
+Eski kurulumda çok toplamak üremeye neredeyse hiç dönüşmüyordu ve **vermek
+kârlıydı** — "paylaşım ödüllendirilmez" kuralı kodda değil ama sonuçta ihlal
+oluyordu. Paylaşım sorularında servet de kontrol edilmeli: yalnız yaş
+kontrolüyle iki kurulumda da "vermek kârlı" görünür.
+
+### Bölüm 3 — Faz 3'ün ana bulgusu tekrarlanmadı
+
+Aynı rejim, temiz ekoloji, 5 seed, her biri kendi karıştırma kontrolüyle:
+
+| | eski zemin | temiz ekoloji |
+|---|---|---|
+| kontrolden ayrıştı | **5/5** | **0/5** |
+| `kin_bias_adj` asıl | +28.02 ± 10.05 | +1.27 ± 0.55 |
+| `kin_bias_adj` kontrol | +0.39 ± 0.15 | +1.94 ± 0.46 |
+| Welch t | +10.75 ± 5.33 | −4.58 ± 4.92 |
+
+Paylaşım oranı %1.1–2.4'e iniyor — Faz 3 adım 1'in (need_bonus = 0) sonucuyla
+aynı yer. Ham iç/dış oranı 4 seed'de hâlâ 1'in üstünde (%2.40 / %0.56 = 4.3×)
+ama enerji katmanlı ve **kontrole karşı** okunan ölçü hayır diyor — `kin_bias`'in
+tek başına neden kanıt olmadığının bir örneği daha.
+
+Yan bulgu: saldırı bu zeminde yabancıya yöneliyor (`atk_t` 4/5 seed'de −2'nin
+altında). Temiz ekolojide **düşmanlık ayrım gözetiyor, fedakârlık gözetmiyor**.
+
+---
+
 ## 4. Nasıl çalıştırılır
 
 ```bash
@@ -473,7 +559,7 @@ python run.py --steps 2000 --viz none    # sadece metrik, en hızlısı
 python run.py --viz pygame               # canlı pencere (SPACE: duraklat, Q: çık)
 python run.py --seed 7 --name deney7
 python run.py --check-determinism
-python -m unittest discover -s tests     # 92 test
+python -m unittest discover -s tests     # 103 test
 ```
 
 Hazır deneyler (`experiments/README.md`):
@@ -494,6 +580,14 @@ python run.py --config experiments/faz4_taban.yaml \
   --load-genomes docs/faz4tani/population_taban.npz --seed 42
 python tools/basin_map.py --seeds 1 7 42 123 777 --out runs/havza.jsonl
 python tools/basin_map.py --summary runs/havza.jsonl
+```
+
+Faz 4.5'in **temiz ekolojisi** (korunumlu paylaşım + bağlayıcı olmayan tavan):
+
+```bash
+python run.py --config experiments/faz45_ekoloji.yaml \
+  --load-genomes docs/faz4tani/population_taban.npz --seed 42
+python tools/selection_probe.py --steps 8000   # enerji -> ureme -> secilim
 ```
 
 Faz 4'ün 2×2'si (dört kol da Faz 2 tohumuyla, her biri kendi kontrolüyle):
@@ -586,6 +680,8 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `death_predator`, `predator_strikes`, `predator_kills` | avcı muhasebesi |
 | `predation_risk` | kişi başı avlanma baskısı (öldürme / ajan) |
 | `forage_per_capita`, `share_per_capita` | ajan-adım başına **mutlak** toplama / aktarım (oran değil) |
+| `energy_created` | paylaşımın yarattığı/yok ettiği net enerji — korunumlu modda **tam 0** |
+| `repro_blocked`, `at_cap` | tavan yüzünden yanan üreme hakkı / popülasyon tavana değdi mi |
 | `gp_<parametre>` | her genom parametresinin popülasyon ortalaması — evrimin **yönü** |
 | `cooperation_rate` | Faz 3 için ayrılmış |
 
@@ -665,6 +761,11 @@ Tam tablo ve görseller: **[docs/faz3/](docs/faz3/)**
 
 Tam tablo: **[docs/faz3/adim2_parochial.md](docs/faz3/adim2_parochial.md)**
 
+⚠⚠ **Bu bölüm ve aşağıdaki bütün `need_bonus > 0` sonuçları, paylaşımın
+enerji ÜRETTİĞİ bir dünyada ölçüldü (§3.5 düzeltmesi).** Her kolun kendi
+kontrolüne karşı okunması geçerliydi, ama temel bulgu — in-grup fedakârlığın
+evrimleşmesi — korunumlu ekolojide **tekrarlanmadı** (5/5 → 0/5 seed, §3.8).
+
 Dört hücreli matris (son çeyrek, fırsata koşullu):
 
 | | asıl in-grup | asıl dış-grup | kontrol in | kontrol dış |
@@ -694,6 +795,9 @@ Dört hücreli matris (son çeyrek, fırsata koşullu):
 ### Faz 3 sağlamlık taraması (5 seed, aynı rejim, her biri kontrolüyle)
 
 Tam tablo: **[docs/faz3/adim2_seed_taramasi.md](docs/faz3/adim2_seed_taramasi.md)**
+
+⚠⚠ Bu tarama da `need_mode: energy` dünyasındadır; temiz ekolojideki
+karşılığı 0/5'tir (§3.8).
 
 - **In-grup fedakârlık 5/5 seed'de kontrolden ayrıştı.** `kin_bias_adj`
   asıl +28.02 ± 10.05 puan, kontrol +0.39 ± 0.15; Welch t +10.75 ± 5.33,
@@ -807,6 +911,34 @@ Tam tablo: **[docs/faz4tani/tani_bistabilite.md](docs/faz4tani/tani_bistabilite.
   5 seed'de işbirliği %10.0–22.7 (yayılım 12.7 puan), dış-grup payı %51,
   etkin soy 7.2 — önceden ilan edilmiş beş ölçütün hepsi geçildi.
 
+### Faz 4.5 — ekoloji borcu (yemek arzı taraması + 5 seed × 2 + seçilim sondası)
+
+Tam tablo: **[docs/faz45/ekoloji_borcu.md](docs/faz45/ekoloji_borcu.md)**
+
+- **⚠⚠ Paylaşım enerji yaratıyordu.** `need_bonus` alıcıya vericinin
+  kaybettiğinden 4 kata kadar fazla gerçek enerji veriyordu. Üretilen enerji /
+  yenen yemek: %4 işbirliğinde %7, %90'da **%96**, %97'de **%321**. Tanının
+  "kaçak havza"sının mekanizması bu; `need_mode: fitness` ile korunum sağlandı.
+- **Çevresel sınırlama, yemek arzına dokunmadan sağlandı.** Pompa kalkıp tavan
+  kaldırılınca koloni kendiliğinden N ≈ 750'de dengeleniyor (eski tavan 700'e
+  yakın). Tavanda geçen adım %99.4 → %0.0; yanan üreme hakkı ~456/adım → 0.
+  N, yemek arzına doğru orantılı yanıt veriyor (doz-yanıt). 5/5 seed.
+- **Seçilim zinciri gerçekten kırıkmış.** Yaş kontrollü "yemek → yavru" bağı
+  **+0.047 → +0.738**; hiç üremeyen yetişkin payı %67.1 → %43.8. Ham korelasyon
+  (+0.317) bunu gizliyordu.
+- **Eski kurulumda VERMEK kârlıydı.** Yaş *ve* servet kontrol edildiğinde bile
+  paylaşan daha çok üremişti (+0.114); korunumlu kurulumda bu −0.080'e dönüyor.
+  "Paylaşım ödüllendirilmez" kuralı kodda değil ama **sonuçta** ihlal oluyormuş.
+- **Faz 3'ün ana bulgusu temiz zeminde TEKRARLANMADI.** In-grup fedakârlık
+  5/5 → **0/5** seed'de kontrolden ayrıştı; `kin_bias_adj` asıl +1.27 ± 0.55,
+  kontrol +1.94 ± 0.46 (kontrol daha yüksek). Paylaşım oranı %1.1–2.4 —
+  Faz 3 adım 1'in (need_bonus = 0) sonucuyla aynı yer.
+- Yan bulgu: temiz ekolojide **saldırı** yabancıya yöneliyor (`atk_t` 4/5
+  seed'de −2'nin altında) — düşmanlık ayrım gözetiyor, fedakârlık gözetmiyor.
+- Yan düzeltme: `death_killed` ve `death_predator` sütunları `BASE_COLUMNS`'ta
+  vardı ama satıra hiç yazılmıyordu; CSV'de boş hücre, `summary.txt`'de 0
+  görünüyordu.
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -844,21 +976,25 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
    `experiments/faz4_taban.yaml` + `docs/faz4tani/population_taban.npz`.
    Adım 2'nin bütün kolları bu tohumla kurulmalı; müdahale eklenince Bölüm B
    ölçütü **yeniden** denetlenmeli.
-3. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
+3. ✅ **Ekoloji borcu** kapatıldı (§3.8). Popülasyonu artık çevre sınırlıyor,
+   seçilim zinciri sağlam, paylaşım korunumlu. Yeni taban:
+   `experiments/faz45_ekoloji.yaml`.
+4. **Faz 3'ün bulgusu temiz zeminde yok.** Adım 2'ye geçmeden önce karar
+   verilmeli: fedakârlığın korunumlu bir dünyada evrimleşebileceği bir kanal
+   var mı? Sonda "almak" için fitness getirisinin gerçek olduğunu söylüyor
+   (+0.319); eksik olan bunun **seçilime görünür** hale gelmesi. Bu, melez
+   soyisimden önce cevaplanacak soru.
+5. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
    etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
    etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
    değiştirmek bu kodu bozmaz — kısmi akrabalık isteniyorsa
    `agent.sense`'teki `kin` hesabı sürekli bir orana çevrilir.
-4. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
+6. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
    `(soy_i, soy_j)` matrisine genişletilecek. `stratified_kin_bias`
    `action` parametresiyle zaten genel; hücre başına da uygulanabilir.
-5. **`agents.max_count` yapısal bir borç.** Popülasyonu çevre değil tavan
-   sınırlıyor (§3.7) ve bu, enerji biriminde ölçülen her fitness argümanını
-   (`bc_ratio`, Hamilton) zayıflatıyor. Çevrenin bağlayıcı olduğu bir ekoloji
-   kurmak Faz 5'in işi; o yapılana kadar `r·b/c` bir seçilim ölçütü gibi
-   okunmamalı.
-6. Adım 2 tohumu: `docs/faz4tani/population_taban.npz` (ölçülebilir taban).
-   Faz 4 adım 1'in avcılı kazananları ise `docs/faz4/population.npz`.
+7. Adım 2 tohumu: `docs/faz45/population_ekoloji.npz` (temiz ekoloji).
+   Eski zeminin tabanı `docs/faz4tani/population_taban.npz`, Faz 4 adım 1'in
+   avcılı kazananları `docs/faz4/population.npz`.
 
 ---
 
@@ -940,4 +1076,24 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
   ölçülen `b/c` o durumda seçilim ölçütü **değildir**.
 - **Varyans patlaması eşiğin imzasıdır.** Bir kaldıraçta seed'ler arası yayılım
   tepe yapıyorsa oradasınız kritik noktadasınız; o ayarı taban seçmeyin.
+- **ENERJİ DEFTERİNİ TUT.** Enerji aktaran her yeni kural için korunumu
+  doğrulayan bir test yazın. `need_bonus` "alıcının dönüşüm verimi" diye
+  belgelenmişken alıcıya 4 kata kadar fazla GERÇEK enerji veriyordu; sonuç
+  sınırsız bir iç enerji kaynağı, çevreden kopmuş bir popülasyon ve kârlı
+  hale gelen bir "fedakârlık" oldu. `energy_created` sayacı bunun için var.
+- **Bir fitness iddiasını enerji olarak uygulamayın.** "Aynı kalori aç bir
+  alıcıya daha değerlidir" bir fitness iddiasıdır; muhasebeye girer, enerji
+  defterine değil (`need_mode: fitness`).
+- **Popülasyon tavana yapışıyorsa seçilim kırıktır.** `at_cap` ve
+  `repro_blocked` ölçün. Tavan bağlıyorken "çok toplayan çok ürer" bağı
+  +0.05'e kadar düşüyordu; tavan kalkınca +0.74. Enerji biriminde ölçülen
+  `b/c` o durumda seçilim ölçütü **değildir**.
+- **Fitness korelasyonlarında YAŞ ve SERVET birlikte kontrol edilir.** Yaşlı
+  ajan hem çok yer hem çok ürer; çok toplayan hem çok paylaşır hem çok ürer.
+  Yalnız yaş kontrolüyle "vermek kârlı" görünüyordu; servet eklenince işaret
+  döndü.
+- **Bir bulgu, üretildiği dünyanın özelliği olabilir.** Faz 3'ün ana sonucu
+  kendi kontrolüne karşı 5/5 ayrışıyordu ve ölçüm doğruydu — ama o dünyada
+  paylaşım enerji üretiyordu. Zemin değişince 0/5. Zemini değiştiren her
+  düzeltmeden sonra ana bulguları **yeniden doğrulayın**.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.

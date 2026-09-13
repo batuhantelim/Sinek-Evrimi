@@ -1,0 +1,43 @@
+# FAZ 4.5 — ÇEVRESEL SINIRLAMA: popülasyonu tavan değil çevre belirler.
+#
+# İki değişiklik, ikisi de yapısal:
+#
+# 1. `rules.share.need_mode: fitness` (korunumlu paylaşım). Eski `energy`
+#    modunda her paylaşım koloniye NET ENERJİ EKLİYORDU; %90 işbirliği olan
+#    bir koşumda üretilen enerji yenen yemeğe eşitleniyordu. Sınırsız bir iç
+#    enerji kaynağı varken çevre bağlayıcı olamaz. (bkz. docs/faz45/)
+# 2. `agents.max_count: 5000` — bağlayıcı olmaktan çıkarıldı. Eskiden 700'dü
+#    ve adımların %99.4'ünde değiyordu; üreme bir slot kuyruğuna dönüşüyor,
+#    adım başına ~456 üreme hakkı yanıyordu.
+#
+# YEMEK ARZI DEĞİŞMEDİ. Pompa kalkınca varsayılan dünya kendiliğinden
+# N ≈ 744'te dengeleniyor (eski tavan 700'e şaşırtıcı biçimde yakın):
+# tavana değme %0.0, yanan üreme hakkı 0, doluluk 0.216'da oturuyor.
+# Yemek arzı ölçeklendiğinde N doğru orantılı yanıt veriyor
+# (×0.25 → 215, ×0.40 → 337, ×0.60 → 450, ×1.00 → 744) — çevresel
+# sınırlamanın doz-yanıt kanıtı.
+#
+# Rejimin geri kalanı Faz 3 adım 2 ile aynı: r_azalan + need_bonus + attack.
+#   python run.py --config experiments/faz45_ekoloji.yaml \
+#     --load-genomes docs/faz4tani/population_taban.npz --seed 42
+run:
+  name: faz45_ekoloji
+  steps: 12000
+agents:
+  max_count: 5000        # bağlayıcı DEĞİL; koloni ~744'te kendiliğinden durur
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+rules:
+  predator:
+    enabled: false
+  share:
+    need_bonus: 3.0
+    need_mode: fitness   # KORUNUMLU — paylaşım enerji yaratmaz
+  attack:
+    enabled: true
+viz:
+  color_by: lineage
+  every: 50

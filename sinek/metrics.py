@@ -154,6 +154,10 @@ class Metrics:
             "death_starved": sim.stats_step["death_starved"],
             "death_hazard": sim.stats_step["death_hazard"],
             "death_old_age": sim.stats_step["death_old_age"],
+            # BU IKISI BASE_COLUMNS'ta vardi ama satira hic yazilmiyordu:
+            # CSV'ye bos hucre dusuyor, summary'de 0 gorunuyordu.
+            "death_killed": sim.stats_step["death_killed"],
+            "death_predator": sim.stats_step["death_predator"],
             "mean_energy": _r(energy.mean() if n else 0.0),
             "std_energy": _r(energy.std() if n else 0.0),
             "mean_age": _r(age.mean() if n else 0.0),

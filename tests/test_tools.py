@@ -255,6 +255,22 @@ class TestBasinMap(unittest.TestCase):
         avcisiz = load_config(os.path.join(ROOT, "experiments", "faz4_avcisiz.yaml")).to_dict()
         self.assertEqual(_mechanics(taban), _mechanics(avcisiz))
 
+    def test_phase45_ecology_only_changes_cap_and_conservation(self):
+        """Faz 4.5'in iddiasi: 'yemek arzi degismedi, yalnizca paylasim
+        korunumlu oldu ve tavan baglayici olmaktan cikti'. Rejim baska bir
+        yerden ayrisirsa bu iddia coker."""
+        eko = load_config(os.path.join(ROOT, "experiments", "faz45_ekoloji.yaml")).to_dict()
+        taban = load_config(os.path.join(ROOT, "experiments", "faz4_taban.yaml")).to_dict()
+        self.assertEqual(eko["world"], taban["world"], "yemek arzi degismis")
+        self.assertEqual(eko["rules"]["share"]["need_mode"], "fitness")
+        self.assertEqual(taban["rules"]["share"]["need_mode"], "energy")
+        self.assertGreater(eko["agents"]["max_count"], taban["agents"]["max_count"])
+        # geri kalan her sey ayni olmali
+        for d in (eko, taban):
+            d["agents"]["max_count"] = 0
+            d["rules"]["share"]["need_mode"] = "-"
+        self.assertEqual(_mechanics(eko), _mechanics(taban))
+
     def test_predator_is_off(self):
         cfg = load_config(
             overrides=seed_sweep.FIXED + seed_sweep.REGIME + [basin_map.PREDATOR_OFF]

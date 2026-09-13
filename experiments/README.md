@@ -28,6 +28,7 @@ python run.py --config experiments/<dosya>.yaml
 | `faz4_avcisiz.yaml` | Avcisiz taban kol (2x2'nin ucuncu hucresi) |
 | `faz4_avcisiz_kontrol.yaml` | Avcisiz karistirma kontrolu |
 | `faz4_taban.yaml` | **Faz 4 olculebilir taban** — rejim ayni, TOHUM farkli (zorunlu) |
+| `faz45_ekoloji.yaml` | **Faz 4.5 TEMIZ EKOLOJI** — korunumlu paylasim + baglayici olmayan tavan |
 
 Tek seferlik degisiklikler icin dosya acmaya gerek yok:
 

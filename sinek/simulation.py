@@ -139,6 +139,9 @@ class Simulation:
         self.stats_step = _empty_stats()
         self.stats_total = _empty_stats()
         self.extinct_at: int | None = None
+        self._record_lifetimes = bool(cfg.get("metrics.record_lifetimes", False))
+        #: (food_eaten, children, age, given, received) — olum aninda
+        self.life_records: list[tuple] = []
         self.last_metrics: dict | None = None  # HUD ve loglama icin son metrik satiri
 
     # ------------------------------------------------------------- kurulum
@@ -265,6 +268,13 @@ class Simulation:
     def _kill(self, a: Agent, cause: str) -> None:
         a.alive = False
         a.death_cause = cause
+        if self._record_lifetimes:
+            # Tam yasam kaydi: enerji -> ureme -> secilim zincirinin saglikli
+            # olup olmadigi ancak TAMAMLANMIS yasamlarda olculebilir
+            # (bkz. tools/selection_probe.py).
+            self.life_records.append(
+                (a.food_eaten, a.children, a.age, a.given, a.received)
+            )
         self.stats_step["deaths"] += 1
         self.stats_step[DEATH_KEYS[cause]] += 1
         if self.mode == "generational":

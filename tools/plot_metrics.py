@@ -50,7 +50,13 @@ def read_csv(path: str) -> dict[str, np.ndarray]:
         raise SystemExit(f"bos CSV: {path}")
     out = {}
     for key in rows[0]:
-        out[key] = np.array([float(r[key]) for r in rows], dtype=np.float64)
+        # Bos hucre 0 sayilir: eski kosumlarda birkac sutun (death_killed,
+        # death_predator) CSV'ye hic yazilmamisti, cizim onlar yuzunden
+        # patlamamali.
+        out[key] = np.array(
+            [float(r[key]) if r.get(key) not in (None, "") else 0.0 for r in rows],
+            dtype=np.float64,
+        )
     return out
 
 

@@ -15,7 +15,7 @@ pip install pygame                  # opsiyonel: canlı pencere
 ## Çalıştırma
 
 ```bash
-python run.py                       # config.yaml (Faz 4) ile koş, PNG kare kaydet
+python run.py                       # config.yaml (Faz 4.5) ile koş, PNG kare kaydet
 python run.py --viz pygame          # canlı pencere (SPACE duraklat, Q çık)
 python run.py --steps 1000 --viz none
 python run.py --check-determinism
@@ -51,6 +51,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 3 — eksen B | Kıtlık da saldırıyı artırmıyor; H1 ve H2 reddedildi | ✅ |
 | 4 — adım 1 | Doğal avcı (grup-kör): düşmanlık da sürü işbirliği de çıkmadı | ✅ |
 | 4 — tanı | Rejim çatalı teşhis edildi; ölçülebilir taban bulundu | ✅ |
+| 4.5 | Ekoloji borcu: paylaşım enerji yaratıyormuş; zincir onarıldı | ✅ |
 | 4 — adım 2 | Melez soyisim, soy-arası matris, gruplar arası rekabet | ⏳ |
 
-Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/)
+Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/)
