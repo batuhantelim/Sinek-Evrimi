@@ -758,6 +758,8 @@ class Simulation:
         stats = self.stats_step
         stats["pick_events"] += 1
         stats["pick_pool"] += len(pool)
+        if len(pool) >= 2:
+            stats["pick_multi"] += 1
         if idx != 0:
             stats["pick_not_nearest"] += 1
         chosen = pool[idx][0]
@@ -921,6 +923,7 @@ def _empty_stats() -> dict:
         "pick_events": 0,       # kac kez aday havuzundan secim yapildi
         "pick_pool": 0,         # toplam aday (ortalama havuz buyuklugu icin)
         "pick_not_nearest": 0,  # secim EN YAKIN olmayani sectiyse
+        "pick_multi": 0,        # havuzda >=2 aday oldugu karar sayisi (onkosul)
         "pick_kin": 0,          # secilen akraba miydi
         "near_kin": 0,          # EN YAKIN akraba miydi (ASIL referans)
         "pool_kin": 0,          # havuzdaki akraba sayisi (konfoundlu referans)

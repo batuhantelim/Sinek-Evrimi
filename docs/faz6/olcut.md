@@ -95,3 +95,32 @@ birebir aynı** uygulanır ve yan etkileri (işbirliği tabanı, dış-grup pay�
 `genetic_r`, kişi başı toplama) raporlanır.
 
 Ölçüt 1–4 aynen geçerli.
+
+### Önkoşul taraması sonucu: `rules.kinship.radius = 5.0`
+
+Beş menzil, seed 42, 3000 adım, aynı tohum (`docs/faz5/population_hafiza.npz`),
+seçim kolu:
+
+| menzil | havuz | çok adaylı karar | en-yakın-değil | işbirliği | N | `genetic_r` | etkin soy | dış-grup payı | topla/kişi | paylaş/kişi |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2.5 (Faz 5) | 1.35 | — | 15.3% | 2.38% | 644 | 0.762 | 3.76 | 3.4% | 0.0447 | 0.0548 |
+| 4.0 | 1.91 | 54.8% | 42.0% | 1.24% | 598 | 0.732 | 2.66 | 1.4% | 0.0474 | 0.0537 |
+| **5.0** | **2.85** | **81.3%** | 29.0% | 1.24% | 668 | 0.774 | 3.04 | 2.3% | 0.0454 | 0.0699 |
+| 6.0 | 3.02 | 85.2% | 49.4% | 1.44% | 657 | 0.696 | 1.93 | 2.3% | 0.0451 | 0.0884 |
+| 8.0 | 3.32 | — | 74.6% | 1.22% | 437 | 0.759 | 3.21 | 3.5% | 0.0633 | 0.0762 |
+
+Önkoşulu (havuz ≥ 2.0 **ve** çok adaylı karar ≥ %50) geçen en küçük değer
+**5.0**. `4.0` çok adaylı kararda geçiyor ama ortalama havuzda kalıyor (1.91).
+
+**Yan etkiler ölçüldü, hiçbiri ölçümü bozmuyor:** popülasyon 644 → 668,
+kişi başı toplama neredeyse sabit (0.0447 → 0.0454), `genetic_r` sabit
+(0.762 → 0.774), enerji üretimi 0.0. Kişi başı paylaşım yükseliyor
+(0.0548 → 0.0699) ama **işbirliği oranı düşüyor** (%2.38 → %1.24): fırsat
+sayısı paylaşımdan hızlı büyüyor. Bu yüzden ana ölçüt mutlak seviyeye değil,
+**aynı menzildeki seçimsiz kontrole** karşı okunur.
+
+⚠ **Bu tohumda dış-grup fırsat payı %1.4–3.5** — Faz 4.6'daki %10
+ölçülebilirlik şartının çok altında. Etkin soy da ~3. Yani "işbirliği çıkarsa
+**kime**" sorusunun *akrabalık* kanadı bu zeminde **okunamaz**; rapor bunu
+GÜRÜLTÜ olarak işaretler. Ana soru (işbirliği tabanın üstüne çıkıyor mu) ve
+defter kanadı bundan etkilenmez.

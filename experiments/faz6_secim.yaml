@@ -24,6 +24,12 @@ agents:
   reproduction:
     spawn_radius: 0.3
 rules:
+  # ONKOSUL (EK, olcut.md): aday havuzu >= 2.0 ve kararlarin >= %50'si
+  # cok adayli olmali. radius 2.5 (Faz 5 varsayilani) ile havuz 1.35 idi; secim
+  # diye bir sey yoktu. Taramada 2.5/4.0/5.0/6.0/8.0 denendi, olcutu gecen EN
+  # KUCUK deger 5.0 (havuz 2.85, cok-adayli %81.3). HER UC KOLA da ayni uygulanir.
+  kinship:
+    radius: 5.0
   partner:
     enabled: true
     candidates: 4

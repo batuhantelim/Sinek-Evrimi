@@ -22,6 +22,7 @@ import basin_map  # noqa: E402
 import hamilton_probe  # noqa: E402
 import env_sweep  # noqa: E402
 import predator_sweep  # noqa: E402
+import partner_report  # noqa: E402
 import seed_sweep  # noqa: E402
 
 # Taramanin bilerek farkli tuttugu, mekanigi etkilemeyen dallar.
@@ -307,14 +308,23 @@ class TestBasinMap(unittest.TestCase):
         haf["rules"]["memory"]["enabled"] = False
         self.assertEqual(_mechanics(haf), _mechanics(eko))
 
-    def test_phase6_choice_only_adds_partner_selection(self):
-        """Faz 6'nin iddiasi: 'rejim Faz 5 ile ayni, yalnizca partner secimi
-        acildi'."""
+    def test_phase6_changes_only_choice_and_the_declared_radius(self):
+        """Faz 6 rejimi Faz 5'ten TAM OLARAK iki yerde ayrilir: partner secimi
+        ve etkilesim menzili.
+
+        Menzil bir ONKOSUL geregi yukseltildi (havuz 1.35 iken secilecek bir sey
+        yoktu; bkz. docs/faz6/olcut.md EK) ve UC KOLA DA ayni uygulanir -- yani
+        kontrole karsi okunan olcuye girmez. Ucuncu bir fark sizarsa "yalnizca
+        secim eklendi" iddiasi coker, bu yuzden burada sabitlenir."""
         sec = load_config(os.path.join(ROOT, "experiments", "faz6_secim.yaml")).to_dict()
         haf = load_config(os.path.join(ROOT, "experiments", "faz5_hafiza.yaml")).to_dict()
         self.assertTrue(sec["rules"]["partner"]["enabled"])
         self.assertFalse(haf["rules"]["partner"]["enabled"])
+        # Ilan edilen menzil: onkosul taramasinda olcutu gecen en kucuk deger.
+        self.assertEqual(sec["rules"]["kinship"]["radius"], 5.0)
+        self.assertEqual(haf["rules"]["kinship"]["radius"], 2.5)
         sec["rules"]["partner"] = haf["rules"]["partner"]
+        sec["rules"]["kinship"]["radius"] = haf["rules"]["kinship"]["radius"]
         self.assertEqual(_mechanics(sec), _mechanics(haf))
 
     def test_predator_is_off(self):
@@ -379,3 +389,38 @@ class TestSweepStatistics(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPartnerReport(unittest.TestCase):
+    """Faz 6 raporunun esikleri ONCEDEN ilan edildi (docs/faz6/olcut.md).
+    Kodla dosya ayrisirsa "olcutu sonucu gormeden ilan ettim" iddiasi coker."""
+
+    def test_thresholds_match_the_declared_criteria(self):
+        path = os.path.join(ROOT, "docs", "faz6", "olcut.md")
+        with open(path, encoding="utf-8") as fh:
+            doc = fh.read()
+        self.assertEqual(partner_report.POOL_MIN, 2.0)
+        self.assertEqual(partner_report.MULTI_MIN, 0.50)
+        self.assertEqual(partner_report.OUTGROUP_MIN, 0.10)
+        self.assertEqual(partner_report.T_MIN, 2.0)
+        self.assertIn("\u2265 2.0", doc)          # havuz esigi
+        self.assertIn("%50", doc)                  # cok adayli karar esigi
+        self.assertIn("%10", doc)                  # dis-grup olculebilirligi
+        self.assertIn("Welch t > 2", doc)          # asil olcut
+
+    def test_tail_skips_empty_cells(self):
+        """Eski kosumlarda yeni sutunlar bos hucre olarak durur; rapor bunlara
+        takilip patlamamali (Faz 4.5'te death_killed boslugu boyle yakalandi)."""
+        rows = [{"x": "1"}, {"x": ""}, {"x": "3"}, {"x": "5"}]
+        got = partner_report.tail(rows, "x", frac=1.0)
+        self.assertEqual(list(got), [1.0, 3.0, 5.0])
+
+    def test_outgroup_share_is_a_share(self):
+        rows = [{"opp_kin": "90", "opp_nonkin": "10"}]
+        self.assertAlmostEqual(partner_report.outgroup_share(rows), 0.10)
+
+    def test_welch_t_direction(self):
+        a = np.array([2.0, 2.1, 1.9, 2.05])
+        b = np.array([1.0, 1.1, 0.9, 1.05])
+        self.assertGreater(partner_report.welch_t(a, b), 2.0)
+        self.assertLess(partner_report.welch_t(b, a), -2.0)

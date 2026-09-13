@@ -55,6 +55,7 @@ BASE_COLUMNS = [
     "kin_assortment",     # (gozlenen-beklenen)/(1-beklenen)  ~ Hamilton'un r'si
     "pick_not_nearest",   # secim EN YAKIN olmayani sectiyse (Faz 6)
     "pool_size",          # ortalama aday havuzu buyuklugu
+    "pool_multi",         # kararlarin kaci >=2 adayliydi (SECIM ONKOSULU)
     "pick_kin_rate",      # secilenin akraba olma orani
     "pool_kin_rate",      # HAVUZDAKI akraba orani (referans)
     "pick_kin_sel",       # secicilik: secilen - EN YAKIN (0 ise politika yok)
@@ -471,6 +472,11 @@ def social_rates(stats: dict) -> dict[str, float]:
             _ratio(stats.get("pick_not_nearest", 0), stats.get("pick_events", 0)), 5
         ),
         "pool_size": round(_ratio(stats.get("pick_pool", 0), stats.get("pick_events", 0)), 4),
+        # ONKOSUL: havuz tek adaydan olusuyorsa "secim" diye bir sey YOKTUR.
+        # Ortalama havuz 1.4 iken kollar birebir ayni cikiyordu (olculdu).
+        "pool_multi": round(
+            _ratio(stats.get("pick_multi", 0), stats.get("pick_events", 0)), 5
+        ),
         "pick_kin_rate": round(
             _ratio(stats.get("pick_kin", 0), stats.get("pick_events", 0)), 5
         ),

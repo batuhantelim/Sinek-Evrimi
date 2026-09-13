@@ -162,6 +162,27 @@ class TestExperimentValidity(unittest.TestCase):
         self.assertAlmostEqual(r["pick_kin_sel"], 0.0, places=2,
                                msg="politika yokken secicilik 0 olmali")
 
+    def test_pool_multi_counts_real_choices(self):
+        """ONKOSUL olcusu: havuzda >=2 aday olan kararlarin payi.
+
+        Ortalama havuz buyuklugu yeterli degil — 1 ve 4 adayli kararlarin
+        karisimi da 2.5 ortalama verir. Ilk partide havuz 1.35'ti ve "secim"
+        diye bir sey yoktu; bu sutun onu sessiz kalmadan gosterir.
+        """
+        from sinek.metrics import social_rates
+        stats = {"pick_events": 10, "pick_pool": 25, "pick_multi": 6}
+        r = social_rates(stats)
+        self.assertAlmostEqual(r["pool_size"], 2.5)
+        self.assertAlmostEqual(r["pool_multi"], 0.6)
+
+    def test_pool_multi_is_zero_when_every_pool_is_a_single_candidate(self):
+        """Ajanlar birbirinden uzakken hicbir kararda ikinci aday olmamali."""
+        sim = make(agents__initial_count=4, rules__partner__enabled=True)
+        for i, a in enumerate(sim.agents):
+            a.x, a.y = 10.0 + i * 40.0, 10.0
+        sim.run(1)
+        self.assertEqual(sim.stats_total["pick_multi"], 0)
+
     def test_fitness_has_no_choice_term(self):
         path = os.path.join(os.path.dirname(__file__), "..", "sinek", "agent.py")
         with open(path, encoding="utf-8") as fh:
@@ -222,3 +243,68 @@ class TestDeterminism(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestExclusionProbe(unittest.TestCase):
+    """Sonda OLCMELI, DEGISTIRMEMELI: `_note_pick` sarilmis haliyle koşum
+    birebir ayni state_hash vermeli. Faz 3'te sonda ile simulasyon ici olcu
+    ayrismisti; sonda karari etkiliyorsa o ayrisma yorumlanamaz."""
+
+    def probe_mod(self):
+        import importlib.util
+        path = os.path.join(os.path.dirname(__file__), "..", "tools",
+                            "exclusion_probe.py")
+        spec = importlib.util.spec_from_file_location("exclusion_probe", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_probe_does_not_change_the_run(self):
+        mod = self.probe_mod()
+        ov = list(mod.REGIME) + BASE + ["agents.initial_count=60", "seed=42"]
+        plain = Simulation(load_config(overrides=ov))
+        plain.run(120)
+
+        wrapped = Simulation(load_config(overrides=ov))
+        tally = mod.Tally()
+        original = wrapped._note_pick
+        emax = float(wrapped.physics.energy_max) if hasattr(
+            wrapped.physics, "energy_max") else 100.0
+        wrapped._note_pick = lambda a, pool, idx: (
+            tally.note(a, pool, idx, emax), original(a, pool, idx))[1]
+        wrapped.run(120)
+
+        self.assertEqual(plain.state_hash(), wrapped.state_hash())
+        self.assertGreater(tally.events, 0, "hic karar kaydedilmedi, test bos")
+
+    def test_structural_and_individual_exclusion_are_separate(self):
+        """Yapisal dislama havuz buyuklugunun zorunlu sonucudur; bireysel
+        dislama davranistir. Ikisi ayni sayi degildir."""
+        mod = self.probe_mod()
+        tally = mod.Tally()
+
+        class G:
+            surname = 1
+
+        class A:
+            def __init__(self, i):
+                self.id = i
+                self.genome = G()
+                self.mem_id = i
+                self.energy = 50.0
+                self.ledger = {}
+
+        a = A(0)
+        others = [A(1), A(2), A(3)]
+        for _ in range(10):                      # her seferinde ayni adayi sec
+            tally.note(a, [(o, 1.0) for o in others], 0, 100.0)
+        r = tally.summary()
+        self.assertAlmostEqual(r["structural"], 2.0 / 3.0, places=3)
+        self.assertAlmostEqual(r["individual"], 2.0 / 3.0, places=3)
+        tally2 = mod.Tally()
+        for i in range(3):                       # sirayla hepsini sec
+            tally2.note(a, [(o, 1.0) for o in others], i, 100.0)
+        r2 = tally2.summary()
+        self.assertAlmostEqual(r2["structural"], 2.0 / 3.0, places=3)
+        self.assertAlmostEqual(r2["individual"], 0.0, places=3,
+                               msg="hepsi bir kez secildi, bireysel dislama 0")
