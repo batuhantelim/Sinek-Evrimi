@@ -120,6 +120,9 @@ def probe(steps: int, seed: int, load: str | None, control: str,
     sim.run(steps)
     res = tally.summary()
     res["population"] = len(sim.agents)
+    # ENERJI DEFTERI: sondanin kendisi de korunumu raporlar. Yeni bir olcum
+    # eklerken "acaba zemin bozuldu mu" sorusu her seferinde sorulmali.
+    res["energy_created"] = float(sim.stats_total.get("energy_created", 0.0))
     res["cooperation"] = (
         sim.stats_total["share_events"] / max(1, sim.stats_total["opp_kin"]
                                              + sim.stats_total["opp_nonkin"])
@@ -142,7 +145,9 @@ def main(argv=None) -> int:
           f"{args.steps} adim")
     print("=" * 72)
     print(f"  karar {r['events']:>9d}   ortalama havuz {r['pool']:.2f}   "
-          f"N {r['population']}   isbirligi {r['cooperation']*100:.2f}%")
+          f"N {r['population']}   isbirligi {r['cooperation']*100:.2f}%   "
+          f"E_yaratilan {r['energy_created']:.1f}"
+          + ("" if abs(r["energy_created"]) < 1e-6 else "  ⚠GECERSIZ"))
     print(f"  YAPISAL dislama   {r['structural']*100:6.1f}%   "
           "(havuz buyudukce kaciniLMAZ olarak artar — bilgi degil)")
     print(f"  BIREYSEL dislama  {r['individual']*100:6.1f}%   "

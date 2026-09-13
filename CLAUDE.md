@@ -41,9 +41,11 @@ davranış oradan **türer**.
 | **Faz 4.5** | Ekoloji borcu: paylaşım enerji yaratıyordu; zincir onarıldı, Faz 3 sonucu tekrarlanmadı | ✅ **tamam** |
 | **Faz 4.6** | Korunumlu zeminde `r·b > c` araması: 15 koşulun hiçbiri eşiği geçmedi | ✅ **tamam** |
 | **Faz 5** | Karşılıklılık: üç önkoşul sağlandı, yine de evrimleşmedi (0/5) | ✅ **tamam** |
+| **Faz 6** | Partner seçimi: dışlama evrimleşti, işbirliği tabandan çıkmadı | ✅ **tamam** |
 | **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
-`config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 4).
+`config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 6 —
+tek istisna `rules.kinship.radius`, aşağıda §3.11).
 Önceki fazlar `experiments/` altındaki hazır konfigürasyonlarla tek komutta
 yeniden üretilir.
 
@@ -110,6 +112,10 @@ SENSOR_NAMES = [bias, energy, age, food_here, food_fwd, food_left,
                 partner_known, partner_ledger]      # Faz 5
 MOTOR_NAMES  = [turn, thrust, eat, share, attack]   # Faz 3
 ```
+
+Faz 6'da bu "komşu" artık mekânın dayattığı en yakın komşu değil: menzildeki
+en yakın `k` aday bulunur ve hedef genomdaki `pick_*` ağırlıklarıyla **seçilir**
+(`rules.partner`). Ağırlıklar 0 iken davranış seçimsiz kolla özdeştir.
 
 `share` ve `attack` aynı komşuyu hedefler ve **birbirini dışlar**: hangisi
 kendi eşiğini daha çok aşıyorsa o gerçekleşir. Böylece "verecek miyim /
@@ -673,6 +679,92 @@ olmadığı için** başlayamıyor olabilir. Ölçülmedi.
 
 ---
 
+## 3.11 Faz 6: partner seçimi
+
+Tam rapor: **[docs/faz6/partner_secimi.md](docs/faz6/partner_secimi.md)**
+Ölçüt (koşumlardan önce yazıldı): **[docs/faz6/olcut.md](docs/faz6/olcut.md)**
+
+### Mekanik: seçme yeteneği verilir, politika verilmez
+
+Faz 5'e kadar hedef **her zaman en yakın** komşuydu — kiminle paylaşacağını
+mekân dayatıyordu. `rules.partner.enabled` ile menzildeki en yakın `candidates`
+aday bulunur (`spatial.candidates`) ve hedef genomdan gelen beş ağırlıkla
+puanlanır:
+
+```
+skor = pick_kin·kin + pick_ledger·defter + pick_need·ihtiyaç
+     + pick_energy·enerji + pick_dist·(−mesafe)
+```
+
+Beş ağırlık `genome.params`'ta, `param_bounds`'ta sınırlı, **0.0'dan başlar** ve
+mutasyona uğrar. Hepsi 0 iken skor eşittir, beraberliği mesafe bozar → davranış
+seçimsiz kolla **özdeş** (`test_zero_weights_match_no_choice` state_hash ile
+sabitler). **"İyi partner seç" diye bir kural yoktur**
+(`test_choice_policy_is_not_hardcoded` skorda elle yazılmış katsayı aramaz).
+
+Kontroller: `enabled: false` (seçimsiz, Faz 5'in birebir aynısı) ve
+`control: random` (havuz var, seçim rastgele — "yetenek mi akıllı kullanım mı").
+
+### ⚠⚠ Mekanik iki ayrı nedenle SESSİZCE ölüydü
+
+İlk parti seçim kolunu seçimsiz kolla **birebir aynı** `state_hash`'te verdi:
+
+1. **`load_population` yeni parametreleri yüklemiyordu.** Ağırlık taşıması
+   (`migrate_weights`) Faz 2'den beri vardı ama **parametre** taşıması yoktu;
+   `mutate` de mevcut anahtarlar üzerinde gezdiği için `pick_*` asla mutasyona
+   uğramadı. Artık config varsayılanlarıyla ekleniyor ve
+   `meta["migrated"]["new_params"]` ile **raporlanıyor**.
+2. **Aday havuzu ortalama 1.35 kişi.** `kinship.radius = 2.5`'te çoğu ajanın
+   menzilinde tek komşu var. **Seçenek yoksa seçim de yoktur.**
+
+Buradan çıkan önkoşul (Faz 5'in "üç önkoşul" disiplininin aynısı): ortalama
+havuz **≥ 2.0** ve kararların **≥ %50'si çok adaylı** (`pool_multi` sütunu).
+Menzil tarandı, ölçütü geçen **en küçük** değer `radius = 5.0` ve **üç kola da
+aynı** uygulandı. `experiments/faz6_secim.yaml` bunu pinler;
+`config.yaml` varsayılanı **2.5'te bırakıldı** çünkü Faz 1–5'in bütün taban
+çizgileri o menzilde ölçüldü — varsayılanı oynatmak eski deney dosyalarını
+sessizce başka bir deneye çevirirdi (rejim testi ikisini karşılaştırır).
+
+### Sonuç: işbirliği kurulmadı, ama dışlama evrimleşti
+
+5 seed × 3 kol, 12000 adım, `docs/faz5/population_hafiza.npz` tohumundan:
+
+| ölçüt | sonuç |
+|---|---|
+| korunum | `energy_created` = 0, **15/15** koşum |
+| ölçülebilirlik | ❌ dış-grup payı %0.1–2.0, etkin soy ~1 → **akrabalık kanadı okunmaz** |
+| **işbirliği tabanı aştı** | ❌ kontrolden ayrışma 3/5, taban bandından (%0.6–2.4) çıkma **0/5** |
+| rastgele seçim de aynısını yapıyor | **4/5** seed → artışın kaynağı politika değil **havuzun varlığı** |
+| dışlama politikası evrimleşti | ✅ bireysel dışlama %12–37, rastgelede %6.4–7.4 (**5/5**) |
+| ama "iyi vericiyi" seçmiyor | defter oranı medyan 1.06, rastgelede 1.24 |
+
+Yan bulgu: havuz eklenince **saldırı paylaşımdan daha çok büyüyor**
+(medyan ×2.31 vs ×1.23, 4/5 seed). Faz 4.5/4.6'nın asimetrisi üçüncü kez
+tekrarlandı: korunumlu zeminde düşmanlık ayrım gözetiyor, fedakârlık gözetmiyor.
+
+### ⚠ Aynı ölçü, referansa göre ZIT işaret
+
+`pick_ledger_sel` (seçilen − **en yakın**) çoğu seed'de negatif; sondanın
+"seçilen − **seçilmeyen**" karşılaştırması seed 42'de pozitif. Çelişki yok:
+en yakın komşu, tekrarlı bitişiklik yüzünden havuz ortalamasından daha sık
+defteri pozitiftir. Politika yoksa seçilecek olan en yakındır, dolayısıyla
+**politikanın katkısı ancak en yakına karşı** izole edilir. Havuz ortalamasına
+karşı okunan seçicilik, politika hiç yokken bile +0.05 çıkıyor (ölçüldü).
+
+### Üç mekanizma da elendi
+
+Akrabalık (Faz 4.6), karşılıklılık (Faz 5), partner seçimi (Faz 6) — üçü de
+önkoşulları **ölçülerek** sağlandıktan sonra reddedildi. Faz 6'da ayrıca
+yeteneğin **kullanıldığı** gösterildi (dışlama 5/5), yani bu negatif "mekanik
+ölü kaldı" değil, "mekanik çalıştı ve işbirliği üretmedi".
+
+Hipotez (ölçülmedi): seçilecek "iyi verici" sınıfı fiilen yok — defteri pozitif
+aday payı %2.7–17.8, çoğu seed'de %10'un altında. Partner seçimi de,
+karşılıklılık gibi, **üzerine kurulacağı işbirliği olmadığı için**
+başlayamıyor olabilir.
+
+---
+
 ## 4. Nasıl çalıştırılır
 
 ```bash
@@ -683,7 +775,7 @@ python run.py --steps 2000 --viz none    # sadece metrik, en hızlısı
 python run.py --viz pygame               # canlı pencere (SPACE: duraklat, Q: çık)
 python run.py --seed 7 --name deney7
 python run.py --check-determinism
-python -m unittest discover -s tests     # 123 test
+python -m unittest discover -s tests     # 149 test
 ```
 
 Hazır deneyler (`experiments/README.md`):
@@ -727,6 +819,27 @@ python run.py --config experiments/faz5_hafiza.yaml --seed 42 --viz none \
   --set rules.memory.control=shuffle_ledger --name f5_kontrol
 python tools/kin_probe.py runs/f5_kontrol/population.npz \
   --channel partner_ledger --set rules.memory.enabled=true
+```
+
+Faz 6 (partner seçimi; üç kol, hepsi Faz 5 tohumuyla ve **aynı** menzille):
+
+```bash
+for k in secim secimsiz rastgele; do
+  case $k in
+    secim)    A="" ;;
+    secimsiz) A="--set rules.partner.enabled=false" ;;
+    rastgele) A="--set rules.partner.control=random" ;;
+  esac
+  python run.py --config experiments/faz6_secim.yaml \
+    --load-genomes docs/faz5/population_hafiza.npz --seed 42 --viz none $A \
+    --name f6_${k}_s42
+done
+python tools/partner_report.py --seeds 42 7 123 1 777
+# Dislama: politikanin kendi katkisi, ayni genomlarla rastgele secime karsi
+python tools/exclusion_probe.py --steps 3000 --control none \
+  --load runs/f6_secim_s42/population.npz
+python tools/exclusion_probe.py --steps 3000 --control random \
+  --load runs/f6_secim_s42/population.npz
 ```
 
 Faz 4'ün 2×2'si (dört kol da Faz 2 tohumuyla, her biri kendi kontrolüyle):
@@ -825,6 +938,11 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `recip_bias`, `recip_bias_adj` | karşılıklılık: `P(paylaş \| defter +)` − `P(paylaş \| defter ≤0)` (ham / enerji katmanlı) |
 | `retal_bias_adj` | misilleme: `P(saldır \| defter −)` − `P(saldır \| defter ≥0)`, katmanlı |
 | `opp_ledger_pos/neg`, `ledger_pos_share` | defter örneklem büyüklükleri (küçükse oran gürültüdür) |
+| `pool_size` | ortalama aday havuzu (Faz 6) — 1'e yakınsa **seçim diye bir şey yoktur** |
+| `pool_multi` | kararların kaçı ≥2 adaylıydı — seçimin ÖNKOŞULU (ortalama tek başına yetmez) |
+| `pick_not_nearest` | seçim en yakını atladı mı (yetenek gerçekten kullanılıyor mu) |
+| `pick_kin_sel`, `pick_ledger_sel` | seçicilik: seçilen − **EN YAKIN** (politika yoksa 0) |
+| `pick_kin_sel_raw`, `pool_kin_rate` | seçilen − havuz ortalaması — **KONFOUNDLU**, kanıt değil |
 | `repro_blocked`, `at_cap` | tavan yüzünden yanan üreme hakkı / popülasyon tavana değdi mi |
 | `gp_<parametre>` | her genom parametresinin popülasyon ortalaması — evrimin **yönü** |
 | `cooperation_rate` | Faz 3 için ayrılmış |
@@ -1125,6 +1243,39 @@ Tam tablo: **[docs/faz5/karsiliklilik.md](docs/faz5/karsiliklilik.md)**
   bitişiklik tekrarlı karşılaşma değildir; sıkışık mekân zemini düşürüyor.
 - Enerji korunumu 10/10 koşumda tam.
 
+### Faz 6 — partner seçimi (menzil taraması + 5 seed × 3 kol + dışlama sondası)
+
+Tam tablo: **[docs/faz6/partner_secimi.md](docs/faz6/partner_secimi.md)**
+
+- **⚠⚠ İlk parti hiç ölçüm yapmamıştı.** Seçim kolu, seçimsiz kolla birebir
+  aynı `state_hash`'i verdi: (a) `load_population` yeni `pick_*` parametrelerini
+  yüklemiyordu, dolayısıyla mutasyona da uğramıyorlardı; (b) aday havuzu
+  ortalama 1.35 kişiydi. **Seçenek yoksa seçim de yoktur.** Önkoşul ilan edildi
+  (havuz ≥ 2.0 ve kararların ≥ %50'si çok adaylı) ve `pool_multi` sütunu eklendi.
+- **Menzil ölçütü geçen en küçük değerde sabitlendi** (`radius = 5.0`, havuz
+  2.85, çok adaylı %81.3) ve **üç kola da aynı** uygulandı. Yan etkiler ölçüldü:
+  N 644 → 668, kişi başı toplama sabit, `genetic_r` sabit, korunum 0.
+- **İŞBİRLİĞİ TABAN BANDINDAN ÇIKMADI.** Kontrolden yukarı ayrışma 3/5 seed
+  (t +3.6…+13.6) ama en yüksek seviye %0.93 — ölçüt %2.4'ün üstünü istiyordu.
+  **0/5.** Aracın ilk sürümü yalnızca t'ye bakıp "KURDU" yazıyordu; ölçütün
+  ikinci yarısı koda eklendi (`BASELINE_HIGH`) ve test dosyayla karşılaştırıyor.
+- **Ayrışan yerde bile kaynağı politika değil: 4/5 seed'de rastgele seçim
+  aynısını (ya da fazlasını) yapıyor.** Yükselişi yapan şey havuzun varlığı.
+  Rastgele-seçim kontrolü tam bunun için ilan edilmişti.
+- **Havuz işbirliğini değil düşmanlığı büyütüyor**: seçimsiz → rastgele geçişte
+  paylaşım medyan ×1.23, saldırı medyan **×2.31** (4/5 seed). Faz 4.5/4.6
+  asimetrisi üçüncü kez tekrarlandı.
+- **Dışlama politikası GERÇEKTEN evrimleşti (5/5).** Aynı genomlar, yalnızca
+  seçim kuralı değişerek: bireysel dışlama %12.3–36.6 vs rastgele %6.4–7.4.
+  Ama "iyi vericiyi seç" biçiminde değil — defter oranı medyan 1.06, rastgelede
+  1.24 (4/5 seed'de rastgele daha seçici). ⚠ Yalnızca seed 42'ye bakılsaydı
+  (2.21 vs 1.24) "karşılıklı seçim evrimleşti" denecekti.
+- **⚠ Ölçülebilirlik ölçütü GEÇMEDİ**: dış-grup fırsat payı %0.1–2.0, etkin soy
+  ~1.0 (Faz 5 tohumu tek soya inmiş). Akrabalık kanadı okunmaz; `pick_kin_sel`
+  iki sıfırın farkı olduğu için Welch t'si +14.73'e kadar çıkıyor ve rapor o
+  hücreyi bayraklıyor.
+- Enerji korunumu 15/15 koşumda ve sondada tam.
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -1176,15 +1327,29 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
    kurulacağı işbirliği (~%1 paylaşım) olmadığı için başlayamıyor olabilir.
    Sınamak için paylaşımı **ödüllendirmeden** dışarıdan yükseltip
    karşılıklılığın o zaman çıkıp çıkmadığına bakmak gerekir.
-6. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
+6. ✅ **Partner seçimi de elendi (§3.11).** Önkoşul ölçülerek sağlandı
+   (havuz 2.57–2.91), yetenek gerçekten kullanıldı (dışlama 5/5 seed'de
+   rastgeleden ayrıştı) — ama işbirliği taban bandından çıkmadı (0/5) ve
+   ayrıştığı yerde bile rastgele seçim aynısını yapıyor (4/5). **Üç mekanizma
+   da elendi.** Bundan sonra denenecek üç aday, önem sırasıyla:
+   (a) **soy çeşitliliğini geri getirmek** — Faz 5/6 tohumunda etkin soy ~1 ve
+   dış-grup payı %2; akrabalıkla ilgili her ölçü bu zeminde okunmuyor,
+   (b) **gruplar arası rekabet** (bir soyun kazancı diğerinin kaybı — Faz 4
+   adım 1'in eksik yarısı), (c) paylaşımı **ödüllendirmeden** dışarıdan
+   yükseltip karşılıklılık/seçimin o zaman ayrım yapıp yapmadığına bakmak.
+   ⚠ (a) her durumda ilk sırada: ölçülebilirlik ölçütü (dış-grup payı ≥ %10)
+   Faz 6'da GEÇMEDİ, yani yeni bir sosyal mekanik eklemek yine okunamaz bir
+   ölçüm üretir.
+7. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
    etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
    etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
    değiştirmek bu kodu bozmaz — kısmi akrabalık isteniyorsa
    `agent.sense`'teki `kin` hesabı sürekli bir orana çevrilir.
-7. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
+8. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
    `(soy_i, soy_j)` matrisine genişletilecek. `stratified_kin_bias`
    `action` parametresiyle zaten genel; hücre başına da uygulanabilir.
-8. Adım 2 tohumu: `docs/faz5/population_hafiza.npz` (hafızalı) ya da
+9. Adım 2 tohumu: `docs/faz6/population_secim.npz` (seçimli),
+   `docs/faz5/population_hafiza.npz` (hafızalı) ya da
    `docs/faz45/population_ekoloji.npz` (hafızasız temiz ekoloji).
    Eski zeminin tabanı `docs/faz4tani/population_taban.npz`, Faz 4 adım 1'in
    avcılı kazananları `docs/faz4/population.npz`.
@@ -1309,4 +1474,29 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
 - **Tekrarlı karşılaşmada EPİZOT sayın, adım değil.** Aynı komşunun yanında
   100 adım durmak tek karşılaşmadır. Adım-tekrarı %95 iken epizot-tekrarı
   %29'du; mekânı sıkıştırmak zemini yükseltmiyor, **düşürüyor**.
+- **YENİ BİR YETENEK EKLERKEN SEÇENEĞİN VAR OLDUĞUNU ÖLÇÜN.** Faz 6'da partner
+  seçimi açıldı ama aday havuzu ortalama 1.35 kişiydi: seçim kolu, seçimsiz
+  kolla **birebir aynı** `state_hash`'i verdi ve üç koşum boşa gitti. Yeteneğin
+  *kullanılabilirliği* bir önkoşuldur ve ölçülür (`pool_multi`). Ortalama tek
+  başına yetmez — 1 ve 4 adaylı kararların karışımı da 2.5 ortalama verir.
+- **SÖZLEŞME BÜYÜDÜĞÜNDE PARAMETRELER DE TAŞINMALI.** `migrate_weights` Faz
+  2'den beri sensör sütunu ekliyordu, ama `genome.params`'a eklenen yeni bir
+  isim kayıtlı popülasyonda **yoktu** ve `mutate` mevcut anahtarlar üzerinde
+  gezdiği için asla mutasyona uğramadı. Yeni parametre config varsayılanıyla
+  eklenir ve `meta["migrated"]["new_params"]` ile **raporlanır**; sessizce genom
+  değiştirmek gizlenmemesi gereken şeydir.
+- **ÖLÇÜTÜN HER YARISINI KODA KOYUN.** Faz 6 ölçütü iki şey istiyordu:
+  kontrolden yukarı ayrışma **ve** taban bandından çıkma. Araç yalnızca Welch
+  t'ye bakıp "2/3 GEÇTİ → KURDU" yazdı; oysa seviye tabanın içindeydi.
+  "Kontrolden yukarı ayrıştı" ile "kurdu" aynı şey değildir; test aracı ölçüt
+  dosyasıyla karşılaştırır.
+- **YETENEK Mİ POLİTİKA MI: rastgele-kullanım kontrolü şart.** Faz 6'da
+  işbirliği %0.44 → %0.89 çıktı, ama **rastgele** seçim de aynısını yaptı
+  (4/5 seed). Yeni bir karar yeteneği eklerken "yeteneği rastgele kullanan" bir
+  kol olmadan artışı politikaya yazamazsınız.
+- **SEÇİCİLİK REFERANSI, POLİTİKA YOKKEN SEÇİLECEK OLANDIR.** Havuz ortalamasına
+  karşı okunan seçicilik politika hiç yokken bile +0.05 çıkıyor; en yakın komşu
+  uzamsal olarak zaten daha akraba ve tekrarlı bitişiklik yüzünden daha sık
+  defteri pozitif. Aynı sonda referansa göre **zıt işaret** verebiliyor —
+  hangisinin kanıt olduğu önceden yazılır.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.
