@@ -2,7 +2,7 @@
 
 Her dosya `config.yaml` uzerine bindirilir; sadece degistirdigi anahtarlari
 icerir. `config.yaml` her zaman **en guncel fazin** varsayilanini tasir
-(su an Faz 7), onceki fazlar buradan yeniden uretilir. Faz 1/2/3 dosyalari
+(su an Faz 8), onceki fazlar buradan yeniden uretilir. Faz 1/2/3 dosyalari
 `rules.predator.enabled: false` tasir: varsayilan ilerledi diye eski bir
 deney sessizce baska bir deneye donusmemeli.
 
@@ -32,6 +32,7 @@ python run.py --config experiments/<dosya>.yaml
 | `faz5_hafiza.yaml` | **Faz 5** — tanima + hafiza kanali (karsiliklilik olcumu) |
 | `faz6_secim.yaml` | **Faz 6** — partner secimi (aday havuzu + genomdan gelen politika) |
 | `faz7_taze.yaml` | **Faz 7** — TAZE 0. nesil + gocmen orani (cesitlilik sinamasi) |
+| `faz8_yogunluk.yaml` | **Faz 8** — yogunluga bagli secilim; OLCULEBILIR CESITLILIK zemini |
 
 Faz 6 dosyasi tek bir yerde daha Faz 5'ten ayrilir: `rules.kinship.radius: 5.0`.
 Varsayilan 2.5'te aday havuzu ortalama 1.35 kisidir, yani "secim" diye bir sey

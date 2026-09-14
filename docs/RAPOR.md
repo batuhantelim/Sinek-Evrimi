@@ -5,6 +5,13 @@ o ana kadar **kanıtlanmış** olanı yazar. Gelecekteki denemeleri beklemez,
 "canlı doküman" değildir. Yeni bulgular yeni bir rapora yazılır.
 
 Kapsam: 7 faz, 213 kaydedilmiş koşum, 164 test, 37 commit.
+
+> **SONRADAN DÜŞÜLEN NOT (2026-09-14, Faz 8).** Bu belgenin gövdesi
+> değiştirilmedi — dondurulmuş kayıt öyle kalır. Ancak §2.4 ve §5'te "açık
+> sorun" diye yazılan **çeşitlilik koruması Faz 8'de çözüldü**: yoğunluğa bağlı
+> seçilim (`rules.crowding`) seçilim süpürgesini 5 seed'in 4'ünde durdurdu,
+> koloniyi çökertmeden. Ayrıntı: **[faz8/yogunluk.md](faz8/yogunluk.md)**.
+> Raporun geri kalanındaki hiçbir bulgu bundan etkilenmez.
 Ayrıntılı faz raporları: [docs/faz1](faz1/) … [docs/faz7](faz7/).
 Yöntem kuralları ve mimari: [CLAUDE.md](../CLAUDE.md).
 

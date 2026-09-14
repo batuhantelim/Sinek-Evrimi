@@ -41,7 +41,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 ## Şu ana kadar ne bulundu (Faz 1–7 özeti)
 
 **Tam rapor: [docs/RAPOR.md](docs/RAPOR.md)** — dondurulmuş bulgu kaydı
-(7 faz, 213 koşum, 164 test).
+(Faz 1–7; Faz 8 ayrıca [docs/faz8/](docs/faz8/)).
 
 - ✅ **Evrim gerçek.** Kemotaksis sıfırdan evrimleşti: koku gradyanıyla
   hizalanma 0.013 → 0.424 (**×32.6**), aynı dünyada acemi koloniye karşı.
@@ -51,8 +51,10 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
   (1/5 seed) — üçünün de önkoşulları **ölçülerek** sağlandı.
 - ✅ **Asimetri, 3 ayrı fazda tekrarlandı:** düşmanlık ayrım gözetir (saldırı
   yabancıya yönelir), fedakârlık gözetmez.
-- ⚠ **Açık sorun:** güçlü yönlü seçilim soy çeşitliliğini siliyor; denenen
-  düzeltmeler (göçmen oranı dâhil) çözmedi.
+- ✅ **Çeşitlilik sorunu çözüldü (Faz 8).** Yoğunluğa bağlı seçilim (yerel
+  olarak kalabalık olan soy öder) süpürgeyi 4/5 seed'de durduruyor — koloniyi
+  çökertmeden, kişi başı toplamayı **artırarak**. Karıştırma kontrolü daha çok
+  enerji yakıp hiçbir şey kurtarmıyor: mekanizma bilgi, yük değil.
 - 🔍 **Yol boyunca sekiz artefakt yakalandı ve düzeltildi** — biri (paylaşımın
   yoktan enerji üretmesi) düzeltilmeseydi bu liste "fedakârlık evrimleşti"
   diyor olacaktı. Hepsi RAPOR.md §3'te.
@@ -75,6 +77,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 5 | Karşılıklılık: üç önkoşul sağlandı, yine de evrimleşmedi (0/5) | ✅ |
 | 6 | Partner seçimi: dışlama evrimleşti, işbirliği tabandan çıkmadı | ✅ |
 | 7 | Çeşitlilik denetimi: taze başlangıç çözmüyor; Faz 5 geçerli zeminde tekrarlandı | ✅ |
+| 8 | Yoğunluğa bağlı seçilim süpürgeyi durdurdu (4/5); ölçülebilir zemin kuruldu | ✅ |
 | 4 — adım 2 | Melez soyisim, soy-arası matris, gruplar arası rekabet | ⏳ |
 
-Sonuçlar: **[docs/RAPOR.md](docs/RAPOR.md)** (konsolide) · [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/) · [docs/faz46/](docs/faz46/) · [docs/faz5/](docs/faz5/) · [docs/faz6/](docs/faz6/) · [docs/faz7/](docs/faz7/)
+Sonuçlar: **[docs/RAPOR.md](docs/RAPOR.md)** (konsolide) · [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/) · [docs/faz46/](docs/faz46/) · [docs/faz5/](docs/faz5/) · [docs/faz6/](docs/faz6/) · [docs/faz7/](docs/faz7/) · [docs/faz8/](docs/faz8/)

@@ -47,11 +47,13 @@ davranış oradan **türer**.
 | **Faz 5** | Karşılıklılık: üç önkoşul sağlandı, yine de evrimleşmedi (0/5) | ✅ **tamam** |
 | **Faz 6** | Partner seçimi: dışlama evrimleşti, işbirliği tabandan çıkmadı | ✅ **tamam** |
 | **Faz 7** | Çeşitlilik denetimi: taze başlangıç ÇÖZMÜYOR; Faz 5 geçerli zeminde tekrarlandı | ✅ **tamam** |
+| **Faz 8** | Yoğunluğa bağlı seçilim süpürgeyi durdurdu (4/5); ölçülebilir zemin kuruldu | ✅ **tamam** |
 | **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır. Şu an:
-Faz 6 mekaniği açık (partner seçimi + hafıza), Faz 7'nin iki anahtarı ise
-**nötr** değerde (`evolution.immigration_rate: 0.0`, `run.load_genomes: null`).
+Faz 6 mekaniği açık (partner seçimi + hafıza); Faz 7 ve Faz 8'in anahtarları
+**nötr** değerde (`evolution.immigration_rate: 0.0`, `run.load_genomes: null`,
+`rules.crowding.enabled: false`).
 İki bilinçli istisna: `rules.kinship.radius` 2.5'te bırakıldı (§3.11) ve
 "taze" varsayılanı pratikte doğru zemin değil (§3.12).
 Önceki fazlar `experiments/` altındaki hazır konfigürasyonlarla tek komutta
@@ -100,7 +102,7 @@ tools/hamilton_probe.py   Hamilton'un b ve c'sini YAVRU cinsinden ölçer (varsa
 tools/encounter_probe.py  Tekrarlı karşılaşma: EPİZOT mu, uzun bitişiklik mi?
 tools/partner_report.py   Faz 6 üç kol: önkoşul + asıl ölçüt + politika ölçütü ayrı
 tools/exclusion_probe.py  Dışlama: YAPISAL mı BİREYSEL mi; seçilmeyenlerin profili
-tools/diversity_report.py Faz 7: ölçüt 1B (etkin soy + dış-grup) ve çeşitliliğin bedeli
+tools/diversity_report.py Faz 7/8: çeşitlilik ölçütü + çeşitliliğin bedeli (`--faz8-taban`)
 tests/                  unittest — determinizm + faz testleri + araç/yöntem testleri
 ```
 
@@ -864,6 +866,78 @@ isteyen bir deney `docs/faz4tani/population_taban.npz` tohumuyla kurulmalı.
 
 ---
 
+## 3.13 Faz 8: çeşitlilik koruması — yoğunluğa bağlı seçilim
+
+Tam rapor: **[docs/faz8/yogunluk.md](docs/faz8/yogunluk.md)**
+Ölçüt (koşumlardan önce yazıldı): **[docs/faz8/olcut.md](docs/faz8/olcut.md)**
+
+### Mekanik: çevre kuralı, davranış değil
+
+`rules.crowding` — bir ajan, menzilindeki **aynı etiketli** komşu sayısıyla
+orantılı ek metabolik gider öder:
+
+```
+gider = cost × (menzildeki aynı etiketli komşu sayısı)
+```
+
+Nadir olan ucuz yaşar (negatif frekans bağımlılığı). **Hiçbir soy adıyla
+hedeflenmez**: bütün soyisimler tutarlı biçimde yeniden adlandırıldığında ceza
+dağılımı birebir aynı kalır (`test_crowding_is_lineage_blind`). Bir **GİDER**dir,
+kaynak değil — toplam enerji tam olarak `crowding_drain` kadar düşer
+(`test_crowding_only_destroys_energy`) ve `energy_created` = 0 kalır.
+`cost = 0`'da hiçbir rastgelelik/enerji hareketi yoktur: Faz 1–7 hash'leri
+birebir korunur.
+
+⚠ **Test bir hatayı önceden yakaladı**: `_spawn` `crowd_label`'ı genomdan
+okuyor ama kurucular **sonradan** yeniden adlandırılıyor; düzeltilmeseydi bütün
+kurucular aynı etiketi taşıyacak ve ceza "herkes aynı soydan" diye
+hesaplanacaktı (Faz 6'nın "sessizce ölü mekanik"i, bu kez testle yakalandı).
+
+### Sonuç: süpürge durdu (4/5), ve mekanizma BİLGİ — ekstra yük değil
+
+12000 adım, taze zemin, 5 seed × 3 kol, `cost = 0.30`:
+
+| kol | etkin soy | en büyük soy | dış-grup payı | ölçüt |
+|---|---|---|---|---|
+| **taban** (kaldıraç kapalı) | 1.02–2.67 | 52.5–99.7% | %0.5–5.4 | **0/5** |
+| **kaldıraç** | 4.43–15.11 | 14.8–44.9% | %11.9–49.8 | **4/5 GEÇTİ** |
+| **karıştırma kontrolü** | 1.19–3.53 | 44.6–97.4% | %3.4–14.0 | **0/5** |
+
+Karıştırma kontrolü cezayı **karıştırılmış** etiketten hesaplar: aynı tür gider,
+sıfır bilgi. 3/5 seed'de kaldıraçtan **daha fazla** enerji yakıyor (102 253 vs
+42 444) ve yine de çeşitliliği korumuyor. Yani kaldıraç "seçilim baskısını
+zayıflattığı için" değil, **kimin kalabalık olduğunu bildiği için** çalışıyor.
+
+**Koloni çökmedi, toplama İYİLEŞTİ**: popülasyon %0–23 düşüyor ama kişi başı
+toplama 4/5 seed'de yükseliyor (%117–135). Tek kültürün yerini alan çok soylu
+koloni kişi başına daha iyi topluyor.
+
+**Döngüsellik denetimi geçti** (ceza doğrudan etikete baktığı için şarttı):
+`weight_diversity` düşmüyor (3/5 yükseliyor, 1 sabit, 1 düşüyor) ve
+`genetic_r` 5/5 seed'de tabanın yarısının üstünde (en düşük 0.57×) — in/out
+ölçülebilir hale gelirken ölçülecek akrabalık yok olmadı.
+
+### Kalibrasyon: ölçütü geçen EN KÜÇÜK değer
+
+`cost` 0.02–0.20 dördü de geçmedi (0.20 en yakını: etkin soy 4.93, eşik 5.0;
+ikinci seed'de de geçmedi). 0.30/0.40/0.60 üçü de geçti → **0.30** pinlendi.
+⚠ 0.02–0.20 aralığı **tek düze değil** (2.40 → 1.01 → 1.40 → 4.93), tek seed'de
+ölçüldü; "eşik eğrisi" diye okunmamalı.
+
+### Gözlem (ÖLÇÜT DEĞİL)
+
+İşbirliği 2/5 seed'de taban bandını (%0.6–2.4) aştı (%5.40 ve %3.49) — Faz 4.5'ten
+beri ilk kez. **Bulgu değil, gözlem**: bu fazın ölçütü işbirliğini kapsamıyor,
+eşleşmiş bir *sosyal* kontrol yok ve kaldıraç ekolojiyi de değiştiriyor
+(saldırı da 4/5 seed'de yükseliyor). Sınanması sonraki fazın işi.
+
+### Denenmemiş iki kaldıraç
+
+Geniş dünya ve uzamsal sığınaklar (coğrafi ayrışma) bu fazda **hiç koşulmadı**.
+"En iyi kaldıraç budur" demiyoruz; "bu kaldıraç ölçütü geçti" diyoruz.
+
+---
+
 ## 4. Nasıl çalıştırılır
 
 ```bash
@@ -874,7 +948,7 @@ python run.py --steps 2000 --viz none    # sadece metrik, en hızlısı
 python run.py --viz pygame               # canlı pencere (SPACE: duraklat, Q: çık)
 python run.py --seed 7 --name deney7
 python run.py --check-determinism
-python -m unittest discover -s tests     # 164 test
+python -m unittest discover -s tests     # 179 test
 ```
 
 Hazır deneyler (`experiments/README.md`):
@@ -954,6 +1028,23 @@ python run.py --config experiments/faz7_taze.yaml --seed 42 \
 # Olculebilir cesitlilik isteyen her deney BU tohumla kurulur:
 python run.py --config experiments/faz5_hafiza.yaml --seed 42 --viz none \
   --load-genomes docs/faz4tani/population_taban.npz
+```
+
+Faz 8 (çeşitlilik koruması; üç kol, tohum GEREKMEZ — taze zeminde çalışır):
+
+```bash
+for k in taban kaldirac karistirma; do
+  case $k in
+    taban)      A="--set rules.crowding.enabled=false" ;;
+    kaldirac)   A="" ;;
+    karistirma) A="--set rules.crowding.control=shuffled" ;;
+  esac
+  python run.py --config experiments/faz8_yogunluk.yaml --seed 42 --viz none $A \
+    --name f8_${k}_s42
+done
+# Dort parcali olcut, TABAN koluna karsi:
+python tools/diversity_report.py --faz8-taban runs/f8_taban_s42 \
+  runs/f8_taban_s42 runs/f8_kaldirac_s42 runs/f8_karistirma_s42
 ```
 
 Faz 4'ün 2×2'si (dört kol da Faz 2 tohumuyla, her biri kendi kontrolüyle):
@@ -1053,6 +1144,7 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `retal_bias_adj` | misilleme: `P(saldır \| defter −)` − `P(saldır \| defter ≥0)`, katmanlı |
 | `opp_ledger_pos/neg`, `ledger_pos_share` | defter örneklem büyüklükleri (küçükse oran gürültüdür) |
 | `immigrants` | Faz 7: taze kurucu genomla doğan yavru sayısı (etiket değil GENOM çeşitliliği) |
+| `crowding_drain` | Faz 8: yoğunluk cezasının yaktığı enerji — bir **GİDER**, `energy_created` ile karıştırmayın |
 | `pool_size` | ortalama aday havuzu (Faz 6) — 1'e yakınsa **seçim diye bir şey yoktur** |
 | `pool_multi` | kararların kaçı ≥2 adaylıydı — seçimin ÖNKOŞULU (ortalama tek başına yetmez) |
 | `pick_not_nearest` | seçim en yakını atladı mı (yetenek gerçekten kullanılıyor mu) |
@@ -1424,6 +1516,34 @@ Tam tablo: **[docs/faz7/cesitlilik.md](docs/faz7/cesitlilik.md)**
 - Yan bulgu: **seçim mekaniğinin kendisi** soy çeşitliliğini düşürüyor (seçim
   kolu 2.41–5.23, seçimsiz 8.97–13.42).
 
+### Faz 8 — çeşitlilik koruması (7 maliyet kalibrasyonu + 5 seed × 3 kol)
+
+Tam tablo: **[docs/faz8/yogunluk.md](docs/faz8/yogunluk.md)**
+
+- **Yoğunluğa bağlı seçilim süpürgeyi DURDURDU: 4/5 seed**, dört ölçütü birden
+  geçerek (etkin soy ≥5, dış-grup ≥%10, en büyük soy <%80, koloni sağlıklı).
+  Taban 0/5, karıştırma kontrolü 0/5. En büyük soy 86.7–99.7% → 14.8–44.9%.
+- **⚠⚠ Mekanizma BİLGİ, ekstra yük DEĞİL.** Karıştırma kontrolü 3/5 seed'de
+  kaldıraçtan **daha fazla** enerji yakıyor (102 253 vs 42 444) ve çeşitliliği
+  korumuyor. Kontrol olmadan "ceza seçilim baskısını zayıflattı" diye yanlış
+  raporlanacaktı.
+- **Koloni çökmedi, kişi başı toplama İYİLEŞTİ** (4/5 seed'de %117–135).
+  Popülasyon %0–23 düşüyor. Tek kültürün yerini alan çok soylu koloni kişi
+  başına daha iyi topluyor.
+- **Döngüsellik denetimi geçti**: ceza doğrudan etikete baktığı için şarttı —
+  `weight_diversity` düşmüyor, `genetic_r` 5/5 seed'de tabanın yarısının
+  üstünde (en düşük 0.57×). Akrabalık yapısı yaşıyor.
+- **Kalibrasyon**: `cost` 0.02–0.20 geçemedi (0.20 en yakını, iki seed'de de
+  geçmedi); 0.30/0.40/0.60 geçti → en küçüğü 0.30 pinlendi. ⚠ 0.02–0.20 aralığı
+  tek düze değil, tek seed'de ölçüldü.
+- **Test bir hatayı önceden yakaladı**: kurucuların `crowd_label`'ı soyisim
+  yeniden adlandırmasından önce atanıyordu — düzeltilmeseydi ceza "herkes aynı
+  soydan" diye hesaplanacaktı.
+- Enerji korunumu 15/15 koşumda tam; `crowding_drain` ayrı sütunda.
+- Gözlem (ölçüt değil): işbirliği 2/5 seed'de taban bandını aştı (%5.40, %3.49)
+  — ama saldırı da 4/5 seed'de yükseliyor ve eşleşmiş sosyal kontrol yok.
+- **Diğer iki kaldıraç (geniş dünya, uzamsal sığınaklar) hiç koşulmadı.**
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -1497,16 +1617,27 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
    sığınaklar, yoğunluğa bağlı seçilim;
    (b) **seçim mekaniği çeşitliliği düşürüyor** (etkin soy 2.4–5.2 vs 9.0–13.4)
    — Faz 6'nın dışlaması süpürgeyi hızlandırıyor, bu ayrıca incelenmeli.
-8. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
+8. ✅ **Çeşitlilik koruması bulundu (§3.13).** `rules.crowding` (yoğunluğa
+   bağlı seçilim, `cost: 0.30`) süpürgeyi 4/5 seed'de durduruyor, koloniyi
+   çökertmeden, ve karıştırma kontrolüne karşı okunuyor. **Melez soyisim,
+   soy-arası ilişki matrisi ve grup seçilimi artık ölçülebilir bir zemine
+   oturuyor**; zemin `experiments/faz8_yogunluk.yaml` (tohum gerekmez).
+   ⚠ Bu zeminde ölçülecek her sosyal sonuç **kendi eşleşmiş kontrolüne** karşı
+   okunmalı: kaldıraç ekolojiyi de oynatıyor (N −%0–23, kişi başı toplama
+   +%17–35, saldırı 4/5 seed'de yukarı).
+   Denenmemiş: geniş dünya ve uzamsal sığınaklar (Faz 8'in diğer iki kaldıracı).
+9. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
    etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
    etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
    değiştirmek bu kodu bozmaz — kısmi akrabalık isteniyorsa
    `agent.sense`'teki `kin` hesabı sürekli bir orana çevrilir.
-9. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
+10. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
    `(soy_i, soy_j)` matrisine genişletilecek. `stratified_kin_bias`
    `action` parametresiyle zaten genel; hücre başına da uygulanabilir.
-10. Adım 2 tohumu: ⚠ **ölçülebilir çeşitlilik istiyorsanız
-   `docs/faz4tani/population_taban.npz`** (§3.12); diğerleri:
+11. Adım 2 tohumu: ⚠ **artık tohum gerekmiyor** — `experiments/faz8_yogunluk.yaml`
+   taze başlangıçta ölçülebilir çeşitlilik veriyor (§3.13). Tohumlu alternatifler:
+   `docs/faz8/population_cok_soylu.npz` (çok soylu),
+   `docs/faz4tani/population_taban.npz` (§3.12); diğerleri:
    `docs/faz6/population_secim.npz` (seçimli),
    `docs/faz5/population_hafiza.npz` (hafızalı) ya da
    `docs/faz45/population_ekoloji.npz` (hafızasız temiz ekoloji).
@@ -1677,4 +1808,14 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
   zincirini onardık (yemek → yavru +0.047 → +0.738); bu, Faz 5/6 zemininde soy
   çeşitliliğinin çökmesinin muhtemel nedeni. Zemini değiştiren her düzeltmeden
   sonra yalnızca ana bulguları değil **ölçülebilirliği** de yeniden denetleyin.
+- **BİR KALDIRACIN "ÇALIŞTIĞINI" GÖSTERMEK İÇİN BİLGİSİZ SÜRÜMÜNÜ DE KOŞUN.**
+  Faz 8'in yoğunluk cezası çeşitliliği kurtardı — ama karıştırılmış etiketten
+  hesaplanan kontrol **daha fazla** enerji yakıp hiçbir şey kurtarmadı. Ceza
+  eklemek tek başına seçilim baskısını zayıflatır; kaldıracın BİLGİ üzerinden
+  çalıştığı ancak o kontrol varsa söylenebilir.
+- **ETİKETE BAKAN BİR KALDIRAÇ ETİKET ÇEŞİTLİLİĞİNİ TANIM GEREĞİ YÜKSELTİR.**
+  Faz 8'in cezası soyisme bakıyor; "çeşitlilik korundu" demek için
+  `weight_diversity`'nin düşmediğini **ve** `genetic_r`'nin çökmediğini ayrıca
+  göstermek gerekti. Ölçtüğünüz şeyi doğrudan ödüllendiren bir mekanizmada
+  döngüsellik şartını ölçüt dosyasına önceden yazın.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.
