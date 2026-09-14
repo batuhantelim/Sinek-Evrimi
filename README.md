@@ -15,7 +15,7 @@ pip install pygame                  # opsiyonel: canlı pencere
 ## Çalıştırma
 
 ```bash
-python run.py                       # config.yaml (Faz 7) ile koş, PNG kare kaydet
+python run.py                       # config.yaml varsayılanı ile koş, PNG kare kaydet
 python run.py --viz pygame          # canlı pencere (SPACE duraklat, Q çık)
 python run.py --steps 1000 --viz none
 python run.py --check-determinism
@@ -38,6 +38,25 @@ python run.py --set brain.hidden=24 --name buyuk_beyin
 
 Hazır deneyler: [experiments/README.md](experiments/README.md)
 
+## Şu ana kadar ne bulundu (Faz 1–7 özeti)
+
+**Tam rapor: [docs/RAPOR.md](docs/RAPOR.md)** — dondurulmuş bulgu kaydı
+(7 faz, 213 koşum, 164 test).
+
+- ✅ **Evrim gerçek.** Kemotaksis sıfırdan evrimleşti: koku gradyanıyla
+  hizalanma 0.013 → 0.424 (**×32.6**), aynı dünyada acemi koloniye karşı.
+  Seçilimsiz kontrol grubu bunun sürüklenme olmadığını gösteriyor.
+- ❌ **İşbirliğinin üç ana mekanizması da işbirliğini kurmadı.** Akrabalık
+  (`r·b/c` ≤ 0.989, 0/15 koşul), karşılıklılık (1/5 seed), partner seçimi
+  (1/5 seed) — üçünün de önkoşulları **ölçülerek** sağlandı.
+- ✅ **Asimetri, 3 ayrı fazda tekrarlandı:** düşmanlık ayrım gözetir (saldırı
+  yabancıya yönelir), fedakârlık gözetmez.
+- ⚠ **Açık sorun:** güçlü yönlü seçilim soy çeşitliliğini siliyor; denenen
+  düzeltmeler (göçmen oranı dâhil) çözmedi.
+- 🔍 **Yol boyunca sekiz artefakt yakalandı ve düzeltildi** — biri (paylaşımın
+  yoktan enerji üretmesi) düzeltilmeseydi bu liste "fedakârlık evrimleşti"
+  diyor olacaktı. Hepsi RAPOR.md §3'te.
+
 ## Durum
 
 | Faz | İçerik | Durum |
@@ -58,4 +77,4 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 7 | Çeşitlilik denetimi: taze başlangıç çözmüyor; Faz 5 geçerli zeminde tekrarlandı | ✅ |
 | 4 — adım 2 | Melez soyisim, soy-arası matris, gruplar arası rekabet | ⏳ |
 
-Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/) · [docs/faz46/](docs/faz46/) · [docs/faz5/](docs/faz5/) · [docs/faz6/](docs/faz6/) · [docs/faz7/](docs/faz7/)
+Sonuçlar: **[docs/RAPOR.md](docs/RAPOR.md)** (konsolide) · [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/) · [docs/faz46/](docs/faz46/) · [docs/faz5/](docs/faz5/) · [docs/faz6/](docs/faz6/) · [docs/faz7/](docs/faz7/)

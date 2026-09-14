@@ -1,5 +1,9 @@
 # CLAUDE.md — Evrimleşen Sinek Kolonisi
 
+> **Faz 1–7 konsolide bulgu raporu (dondurulmuş kayıt):
+> [docs/RAPOR.md](docs/RAPOR.md)** — ne kanıtlandı, hangi artefaktlar yakalandı,
+> neler açık kaldı. Yeni bir faza başlamadan önce oradan okuyun.
+
 Ajan tabanlı bir yapay yaşam (ALife) simülasyonu. Amaç: çok sayıda basit "sinek"
 ajanını bir ortama koyup **çeşitlilik + seçilim + mutasyon** üzerinden nesiller
 boyunca davranışın kendiliğinden ortaya çıkmasını (emergence) gözlemlemek.
@@ -45,8 +49,11 @@ davranış oradan **türer**.
 | **Faz 7** | Çeşitlilik denetimi: taze başlangıç ÇÖZMÜYOR; Faz 5 geçerli zeminde tekrarlandı | ✅ **tamam** |
 | **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
-`config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 6 —
-tek istisna `rules.kinship.radius`, aşağıda §3.11).
+`config.yaml` **her zaman en güncel fazın** varsayılanını taşır. Şu an:
+Faz 6 mekaniği açık (partner seçimi + hafıza), Faz 7'nin iki anahtarı ise
+**nötr** değerde (`evolution.immigration_rate: 0.0`, `run.load_genomes: null`).
+İki bilinçli istisna: `rules.kinship.radius` 2.5'te bırakıldı (§3.11) ve
+"taze" varsayılanı pratikte doğru zemin değil (§3.12).
 Önceki fazlar `experiments/` altındaki hazır konfigürasyonlarla tek komutta
 yeniden üretilir.
 
@@ -862,7 +869,7 @@ isteyen bir deney `docs/faz4tani/population_taban.npz` tohumuyla kurulmalı.
 ```bash
 pip install -r requirements.txt          # numpy + PyYAML (pygame opsiyonel)
 
-python run.py                            # config.yaml (Faz 2) ile
+python run.py                            # config.yaml varsayilani ile
 python run.py --steps 2000 --viz none    # sadece metrik, en hızlısı
 python run.py --viz pygame               # canlı pencere (SPACE: duraklat, Q: çık)
 python run.py --seed 7 --name deney7
