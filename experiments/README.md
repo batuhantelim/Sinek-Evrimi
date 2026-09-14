@@ -2,7 +2,7 @@
 
 Her dosya `config.yaml` uzerine bindirilir; sadece degistirdigi anahtarlari
 icerir. `config.yaml` her zaman **en guncel fazin** varsayilanini tasir
-(su an Faz 6), onceki fazlar buradan yeniden uretilir. Faz 1/2/3 dosyalari
+(su an Faz 7), onceki fazlar buradan yeniden uretilir. Faz 1/2/3 dosyalari
 `rules.predator.enabled: false` tasir: varsayilan ilerledi diye eski bir
 deney sessizce baska bir deneye donusmemeli.
 
@@ -31,6 +31,7 @@ python run.py --config experiments/<dosya>.yaml
 | `faz45_ekoloji.yaml` | **Faz 4.5 TEMIZ EKOLOJI** — korunumlu paylasim + baglayici olmayan tavan |
 | `faz5_hafiza.yaml` | **Faz 5** — tanima + hafiza kanali (karsiliklilik olcumu) |
 | `faz6_secim.yaml` | **Faz 6** — partner secimi (aday havuzu + genomdan gelen politika) |
+| `faz7_taze.yaml` | **Faz 7** — TAZE 0. nesil + gocmen orani (cesitlilik sinamasi) |
 
 Faz 6 dosyasi tek bir yerde daha Faz 5'ten ayrilir: `rules.kinship.radius: 5.0`.
 Varsayilan 2.5'te aday havuzu ortalama 1.35 kisidir, yani "secim" diye bir sey
@@ -42,6 +43,12 @@ ONKOSUL geregi yukseltildi ve **uc kola da ayni** uygulanir
 python run.py --config experiments/faz6_secim.yaml --set rules.partner.enabled=false  # secimsiz
 python run.py --config experiments/faz6_secim.yaml --set rules.partner.control=random # rastgele
 ```
+
+TOHUM artik bir config anahtaridir (`run.load_genomes`), CLI onu ezer.
+Varsayilan **TAZE**; tohumla kurulmus eski deneyler kendi tohumunu dosyasinda
+ACIKCA yazar (test bunu zorlar). Faz 7'nin olcumu: taze baslangic cesitliligi
+KORUMUYOR — olculebilir soy cesitliligi icin `docs/faz4tani/population_taban.npz`
+tohumu gerekiyor (bkz. docs/faz7/).
 
 Tek seferlik degisiklikler icin dosya acmaya gerek yok:
 

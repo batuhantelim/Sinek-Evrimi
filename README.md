@@ -15,7 +15,7 @@ pip install pygame                  # opsiyonel: canlı pencere
 ## Çalıştırma
 
 ```bash
-python run.py                       # config.yaml (Faz 6) ile koş, PNG kare kaydet
+python run.py                       # config.yaml (Faz 7) ile koş, PNG kare kaydet
 python run.py --viz pygame          # canlı pencere (SPACE duraklat, Q çık)
 python run.py --steps 1000 --viz none
 python run.py --check-determinism
@@ -55,6 +55,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 4.6 | Korunumlu zeminde `r·b > c` aranması: 0/15 koşul eşiği geçti | ✅ |
 | 5 | Karşılıklılık: üç önkoşul sağlandı, yine de evrimleşmedi (0/5) | ✅ |
 | 6 | Partner seçimi: dışlama evrimleşti, işbirliği tabandan çıkmadı | ✅ |
+| 7 | Çeşitlilik denetimi: taze başlangıç çözmüyor; Faz 5 geçerli zeminde tekrarlandı | ✅ |
 | 4 — adım 2 | Melez soyisim, soy-arası matris, gruplar arası rekabet | ⏳ |
 
-Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/) · [docs/faz46/](docs/faz46/) · [docs/faz5/](docs/faz5/) · [docs/faz6/](docs/faz6/)
+Sonuçlar: [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/) · [docs/faz46/](docs/faz46/) · [docs/faz5/](docs/faz5/) · [docs/faz6/](docs/faz6/) · [docs/faz7/](docs/faz7/)

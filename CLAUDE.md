@@ -42,6 +42,7 @@ davranış oradan **türer**.
 | **Faz 4.6** | Korunumlu zeminde `r·b > c` araması: 15 koşulun hiçbiri eşiği geçmedi | ✅ **tamam** |
 | **Faz 5** | Karşılıklılık: üç önkoşul sağlandı, yine de evrimleşmedi (0/5) | ✅ **tamam** |
 | **Faz 6** | Partner seçimi: dışlama evrimleşti, işbirliği tabandan çıkmadı | ✅ **tamam** |
+| **Faz 7** | Çeşitlilik denetimi: taze başlangıç ÇÖZMÜYOR; Faz 5 geçerli zeminde tekrarlandı | ✅ **tamam** |
 | **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır (şu an Faz 6 —
@@ -92,6 +93,7 @@ tools/hamilton_probe.py   Hamilton'un b ve c'sini YAVRU cinsinden ölçer (varsa
 tools/encounter_probe.py  Tekrarlı karşılaşma: EPİZOT mu, uzun bitişiklik mi?
 tools/partner_report.py   Faz 6 üç kol: önkoşul + asıl ölçüt + politika ölçütü ayrı
 tools/exclusion_probe.py  Dışlama: YAPISAL mı BİREYSEL mi; seçilmeyenlerin profili
+tools/diversity_report.py Faz 7: ölçüt 1B (etkin soy + dış-grup) ve çeşitliliğin bedeli
 tests/                  unittest — determinizm + faz testleri + araç/yöntem testleri
 ```
 
@@ -938,6 +940,7 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `recip_bias`, `recip_bias_adj` | karşılıklılık: `P(paylaş \| defter +)` − `P(paylaş \| defter ≤0)` (ham / enerji katmanlı) |
 | `retal_bias_adj` | misilleme: `P(saldır \| defter −)` − `P(saldır \| defter ≥0)`, katmanlı |
 | `opp_ledger_pos/neg`, `ledger_pos_share` | defter örneklem büyüklükleri (küçükse oran gürültüdür) |
+| `immigrants` | Faz 7: taze kurucu genomla doğan yavru sayısı (etiket değil GENOM çeşitliliği) |
 | `pool_size` | ortalama aday havuzu (Faz 6) — 1'e yakınsa **seçim diye bir şey yoktur** |
 | `pool_multi` | kararların kaçı ≥2 adaylıydı — seçimin ÖNKOŞULU (ortalama tek başına yetmez) |
 | `pick_not_nearest` | seçim en yakını atladı mı (yetenek gerçekten kullanılıyor mu) |
