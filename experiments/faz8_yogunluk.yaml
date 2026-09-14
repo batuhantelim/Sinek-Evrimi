@@ -1,0 +1,51 @@
+# FAZ 8 — YOĞUNLUĞA BAĞLI SEÇİLİM: yerel olarak kalabalık olan soy öder.
+#
+# Rejim Faz 7'nin taze zemini (`faz7_taze.yaml`) ile aynı; iki fark:
+#
+# 1. `evolution.immigration_rate: 0.0` — Faz 7 ölçtü, göçmen süpürgeyi
+#    durdurmuyordu (0/6 koşul). Tek kaldıraç sınanacağı için kapatıldı.
+# 2. `rules.crowding` — menzilindeki AYNI etiketli komşu sayısıyla orantılı ek
+#    metabolik gider. Nadir olan ucuz yaşar (negatif frekans bağımlılığı).
+#
+# Hiçbir soy adıyla hedeflenmez; ceza yalnızca YEREL FREKANSA bakar. Bir
+# GİDERdir, kaynak değil (`crowding_drain` sayacı defteri denetlenebilir tutar).
+#
+# Kollar:
+#   taban      --set rules.crowding.enabled=false
+#   kaldirac   (bu dosya)
+#   karistirma --set rules.crowding.control=shuffled
+#
+#   python run.py --config experiments/faz8_yogunluk.yaml --seed 42
+run:
+  name: faz8_yogunluk
+  steps: 12000
+  load_genomes: null      # TAZE — açıkça yazılır
+agents:
+  max_count: 5000
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+evolution:
+  immigration_rate: 0.0
+rules:
+  crowding:
+    enabled: true
+    radius: 5.0
+    cost: 0.30
+    control: none
+  partner:
+    enabled: false
+  memory:
+    enabled: false
+  predator:
+    enabled: false
+  share:
+    need_bonus: 3.0
+    need_mode: fitness
+  attack:
+    enabled: true
+viz:
+  color_by: lineage
+  every: 50

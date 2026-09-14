@@ -110,6 +110,18 @@ class Simulation:
         # Faz 7: dogumlarin bu oraninda yavru TAZE bir kurucu genomla dogar.
         # 0.0 = Faz 1-6 davranisi (hicbir rng cekimi yapilmaz, hash birebir ayni).
         self.immigration_rate = float(cfg.get("evolution.immigration_rate", 0.0))
+        # --- Faz 8: yogunluga bagli secilim (negatif frekans bagimliligi) ---
+        # Yerel olarak KALABALIKLASAN soy adim basina ek enerji oder. Hicbir soy
+        # adiyla hedeflenmez; ceza yalnizca YEREL FREKANSA bakar. Bir GIDERdir,
+        # kaynak degil (paylasimin korunumuna dokunmaz).
+        self.crowding_on = bool(cfg.get("rules.crowding.enabled", False))
+        self.crowding_radius = float(cfg.get("rules.crowding.radius", 5.0))
+        self.crowding_cost = float(cfg.get("rules.crowding.cost", 0.0))
+        self.crowding_control = str(cfg.get("rules.crowding.control", "none"))
+        if self.crowding_control not in ("none", "shuffled"):
+            raise ValueError(
+                f"bilinmeyen rules.crowding.control={self.crowding_control!r}"
+            )
         if self.kin_control not in ("none", "shuffle_surnames", "random_surname_at_birth", "scatter_offspring"):
             raise ValueError(f"bilinmeyen rules.kinship.control={self.kin_control!r}")
         # --- Faz 5: tanima + hafiza ---
@@ -143,6 +155,11 @@ class Simulation:
         self._next_surname = len(self.agents)
         for i, a in enumerate(self.agents):
             a.genome.surname = i
+            # Faz 8: kalabalik cezasinin etiketi soyisimle birlikte yenilenmeli.
+            # `_spawn` onu genomdan okuyor ama kurucular BURADA yeniden
+            # adlandiriliyor; atlanirsa butun kurucular ayni etiketi tasir ve
+            # ceza "herkes ayni soydan" diye hesaplanir (test yakaladi).
+            a.crowd_label = i
 
         self.predators = PredatorPack(cfg, self.world, self.rng)
 
@@ -187,6 +204,7 @@ class Simulation:
             birth_step=self.step_index,
         )
         agent.mem_id = agent.id          # Faz 5: tanima kimligi (kontrol permute eder)
+        agent.crowd_label = genome.surname   # Faz 8: kalabalik cezasinin baktigi etiket
         self._next_id += 1
         return agent
 
@@ -209,10 +227,14 @@ class Simulation:
             for a in self.agents:
                 a.predator_signal = self.predators.signal(a.x, a.y)
 
-        if self._social_enabled:
+        if self._social_enabled or self.crowding_on:
             # Faz 3: akrabalik sensoru ve paylasim ayni "en yakin komsu"yu
-            # kullanir; bir kez hesaplanip onbellege alinir.
+            # kullanir; bir kez hesaplanip onbellege alinir. Faz 8'in kalabalik
+            # cezasi da ayni izgarayi kullanir, sosyal kurallar kapaliyken bile.
             self.hash.build(self.agents)
+            if self.crowding_control == "shuffled":
+                self._shuffle_crowd_labels()
+        if self._social_enabled:
             if self.kin_control == "shuffle_surnames":
                 self._shuffle_surnames()
             if self.memory_control == "shuffle_ledger":
@@ -244,6 +266,12 @@ class Simulation:
         strikes, kills = self.predators.step(self.agents)
         self.stats_step["predator_strikes"] += strikes
         self.stats_step["predator_kills"] += kills
+
+        # 3.7) Faz 8: yogunluga bagli secilim. Yerel olarak ayni etiketten kac
+        #      komsusu varsa o kadar ek metabolik gider. Nadir olan ucuz yasar.
+        #      Bu bir CEVRE kurali; davranis degil, rol degil, odul degil.
+        if self.crowding_on and self.crowding_cost > 0.0:
+            self._apply_crowding_cost()
 
         # 4) cevre etkileri
         metabolism = phys.metabolism
@@ -712,6 +740,46 @@ class Simulation:
             stats["attack_kills"] += 1
         self.attack_events.append((a.x, a.y, other.x, other.y, kin))
 
+    def _apply_crowding_cost(self) -> None:
+        """Negatif frekans bagimliligi: yerel olarak kalabalik olan soy oder.
+
+        Ceza HICBIR SOYU ADIYLA hedeflemez — yalnizca "menzilimde benimle ayni
+        etiketten kac kisi var" sayisina bakar. Butun soyisimler tutarli
+        bicimde yeniden adlandirilsa ceza dagilimi birebir ayni kalir
+        (`test_crowding_is_lineage_blind` bunu zorlar).
+
+        Bir GIDERdir: enerji yok edilir, yaratilmaz. `crowding_drain` sayaci
+        defteri denetlenebilir tutar (Faz 4.5 dersi).
+        """
+        radius = self.crowding_radius
+        cost = self.crowding_cost
+        world = self.world
+        hash_ = self.hash
+        drain = 0.0
+        for a in self.agents:
+            n = hash_.count_label(a, radius, world, a.crowd_label)
+            if n:
+                pay = cost * n
+                a.energy -= pay
+                drain += pay
+        self.stats_step["crowding_drain"] += drain
+
+    def _shuffle_crowd_labels(self) -> None:
+        """KONTROL: ceza ayni buyuklukte kalir ama ETIKET BILGISIZ olur.
+
+        `crowd_label` yasayanlar arasinda permute edilir; `genome.surname`'e
+        DOKUNULMAZ, cunku butun olcumler (soy cesitliligi, in/out) onu okur.
+        Boylece iki kol ayni sayida ajan, ayni soy dagilimi ve benzer toplam
+        gider ile kosar; yalnizca "kim kiminle ayni sayiliyor" bilgisi gider.
+        """
+        n = len(self.agents)
+        if n < 2:
+            return
+        labels = [a.crowd_label for a in self.agents]
+        perm = self.rng.permutation(n)
+        for a, idx in zip(self.agents, perm):
+            a.crowd_label = labels[int(idx)]
+
     def _shuffle_surnames(self) -> None:
         """KONTROL: soyisimleri yasayanlar arasinda karistirir.
 
@@ -927,6 +995,7 @@ def _empty_stats() -> dict:
     return {
         "births": 0,
         "immigrants": 0,        # Faz 7: taze kurucu genomla dogan yavru sayisi
+        "crowding_drain": 0.0,  # Faz 8: yogunluk cezasinin yaktigi enerji (GIDER)
         "deaths": 0,
         "repro_blocked": 0,   # tavan yuzunden yanan ureme hakki (Faz 4.5)
         "death_starved": 0,

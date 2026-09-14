@@ -329,6 +329,32 @@ rules:
     cooldown: 20          # vurus sonrasi bekleme — seyreltmenin motoru
     turn_rate: 0.20       # avci da ani yon degistiremez
 
+  crowding:
+    # FAZ 8 — YOGUNLUGA BAGLI SECILIM (negatif frekans bagimliligi).
+    #
+    # Yerel olarak kalabalik olan soy adim basina ek metabolik gider oder:
+    #   gider = cost * (menzildeki AYNI etiketli komsu sayisi)
+    # Nadir olan ucuz yasar. Bu bir CEVRE kuralidir — davranis kodlanmaz, rol
+    # atanmaz, hicbir soy adiyla hedeflenmez; ceza yalnizca YEREL FREKANSA
+    # bakar (test butun soyisimler yeniden adlandirildiginda ceza dagiliminin
+    # birebir ayni kaldigini zorlar).
+    #
+    # Gerekce: Faz 7 olctu ki guclu yonlu secilim soy cesitliligini siliyor ve
+    # gocmen enjeksiyonu bunu cozmuyor (0/6 kosul). Sosyal mekanikler
+    # cesitlilik olmadan olculemez.
+    #
+    # ⚠ Bu bir GIDERdir, kaynak degil: `crowding_drain` sayaci defteri
+    # denetlenebilir tutar, paylasimin korunumuna (`energy_created`) dokunmaz.
+    #
+    #   none     : normal kosum (ceza gercek soyisme bakar)
+    #   shuffled : KONTROL — ceza KARISTIRILMIS etiketten hesaplanir. Ayni
+    #              buyuklukte gider, sifir bilgi. "Bilgi mi yoksa sadece ekstra
+    #              enerji gideri mi ise yariyor" ayrimi icin.
+    enabled: false
+    radius: 5.0
+    cost: 0.0
+    control: none
+
   kinship:
     radius: 2.5           # hem akrabalik sensoru hem paylasim menzili
     # ⚠ FAZ 6 UYARISI: bu menzilde aday havuzu ortalama 1.35 kisidir, yani

@@ -22,6 +22,7 @@ import basin_map  # noqa: E402
 import hamilton_probe  # noqa: E402
 import env_sweep  # noqa: E402
 import predator_sweep  # noqa: E402
+import diversity_report  # noqa: E402
 import partner_report  # noqa: E402
 import seed_sweep  # noqa: E402
 
@@ -342,6 +343,23 @@ class TestBasinMap(unittest.TestCase):
         taze["evolution"]["immigration_rate"] = eko["evolution"]["immigration_rate"]
         self.assertEqual(_mechanics(taze), _mechanics(eko))
 
+    def test_phase8_changes_only_the_crowding_lever(self):
+        """Faz 8'in iddiasi: 'zemin Faz 7'nin taze zemini, yalnizca yogunluk
+        kaldiraci acildi'. Gocmen de KAPATILDI (Faz 7 onu 0/6 ile eledi) ve bu
+        ikisi disinda ucuncu bir fark sizmamali — yoksa kaldiracin etkisi
+        baska bir degisiklige karisir."""
+        f8 = load_config(os.path.join(ROOT, "experiments", "faz8_yogunluk.yaml")).to_dict()
+        f7 = load_config(os.path.join(ROOT, "experiments", "faz7_taze.yaml")).to_dict()
+        self.assertTrue(f8["rules"]["crowding"]["enabled"])
+        self.assertFalse(f7["rules"]["crowding"]["enabled"])
+        self.assertGreater(f8["rules"]["crowding"]["cost"], 0.0)
+        # Faz 7'nin kaldiraci Faz 8'de kapali: tek eksende olcum.
+        self.assertEqual(f8["evolution"]["immigration_rate"], 0.0)
+        self.assertGreater(f7["evolution"]["immigration_rate"], 0.0)
+        f8["rules"]["crowding"] = f7["rules"]["crowding"]
+        f8["evolution"]["immigration_rate"] = f7["evolution"]["immigration_rate"]
+        self.assertEqual(_mechanics(f8), _mechanics(f7))
+
     def test_predator_is_off(self):
         cfg = load_config(
             overrides=seed_sweep.FIXED + seed_sweep.REGIME + [basin_map.PREDATOR_OFF]
@@ -442,3 +460,23 @@ class TestPartnerReport(unittest.TestCase):
         b = np.array([1.0, 1.1, 0.9, 1.05])
         self.assertGreater(partner_report.welch_t(a, b), 2.0)
         self.assertLess(partner_report.welch_t(b, a), -2.0)
+
+
+class TestDiversityReport(unittest.TestCase):
+    """Faz 7/8 esikleri ONCEDEN ilan edildi; kodla dosya ayrisirsa "olcutu
+    sonucu gormeden ilan ettim" iddiasi coker."""
+
+    def test_thresholds_match_the_declared_criteria(self):
+        with open(os.path.join(ROOT, "docs", "faz8", "olcut.md"), encoding="utf-8") as fh:
+            doc = fh.read()
+        self.assertEqual(diversity_report.LINEAGE_MIN, 5.0)
+        self.assertEqual(diversity_report.OUTGROUP_MIN, 0.10)
+        self.assertEqual(diversity_report.LARGEST_MAX, 0.80)
+        self.assertEqual(diversity_report.POP_MIN_VS_BASE, 0.50)
+        self.assertEqual(diversity_report.FORAGE_MIN_VS_BASE, 0.70)
+        for needle in ("etkin soy \u2265 5.0", "%10", "%80", "%50", "%70"):
+            self.assertIn(needle, doc)
+
+    def test_tail_skips_empty_cells(self):
+        rows = [{"x": "2"}, {"x": ""}, {"x": "4"}]
+        self.assertEqual(list(diversity_report.tail(rows, "x", frac=1.0)), [2.0, 4.0])

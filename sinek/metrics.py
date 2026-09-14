@@ -57,6 +57,7 @@ BASE_COLUMNS = [
     "pool_size",          # ortalama aday havuzu buyuklugu
     "pool_multi",         # kararlarin kaci >=2 adayliydi (SECIM ONKOSULU)
     "immigrants",         # Faz 7: taze kurucu genomla dogan yavru sayisi
+    "crowding_drain",     # Faz 8: yogunluk cezasinin yaktigi enerji (GIDER)
     "pick_kin_rate",      # secilenin akraba olma orani
     "pool_kin_rate",      # HAVUZDAKI akraba orani (referans)
     "pick_kin_sel",       # secicilik: secilen - EN YAKIN (0 ise politika yok)
@@ -476,6 +477,9 @@ def social_rates(stats: dict) -> dict[str, float]:
         # koşumlar arasi degistigi icin "kac tane" ile "hangi oranda" ayri
         # okunmali; oran zaten config'te ilan edilmis sabittir.
         "immigrants": int(stats.get("immigrants", 0)),
+        # Faz 8: yogunluk cezasinin yaktigi enerji. GIDER oldugu icin isareti
+        # daima >= 0; `energy_created` ile karistirilmamali (o korunum sayaci).
+        "crowding_drain": round(float(stats.get("crowding_drain", 0.0)), 3),
         "pool_size": round(_ratio(stats.get("pick_pool", 0), stats.get("pick_events", 0)), 4),
         # ONKOSUL: havuz tek adaydan olusuyorsa "secim" diye bir sey YOKTUR.
         # Ortalama havuz 1.4 iken kollar birebir ayni cikiyordu (olculdu).

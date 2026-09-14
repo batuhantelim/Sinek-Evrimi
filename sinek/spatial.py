@@ -89,6 +89,38 @@ class SpatialHash:
                         best, best_d2 = other, d2
         return best
 
+    def count_label(self, agent, radius: float, world, label) -> int:
+        """radius icinde AYNI etikete sahip kac komsu var (kendisi haric).
+
+        `query` liste kurup siralar; bu sicak yolda adim x ajan basina
+        cagrildigi icin yalnizca SAYAR — tahsis ve siralama yok.
+        Determinizm: sayim sirasi sonucu etkilemez.
+        """
+        x, y = agent.x, agent.y
+        span = int(math.ceil(radius / self.cell))
+        cx, cy = self._key(x, y)
+        r2 = radius * radius
+        aid = agent.id
+        n = 0
+        for gy in range(cy - span, cy + span + 1):
+            for gx in range(cx - span, cx + span + 1):
+                if self.toroidal:
+                    key = (gx % self.nx, gy % self.ny)
+                else:
+                    if not (0 <= gx < self.nx and 0 <= gy < self.ny):
+                        continue
+                    key = (gx, gy)
+                bucket = self.buckets.get(key)
+                if not bucket:
+                    continue
+                for o in bucket:
+                    if o.id == aid or o.crowd_label != label:
+                        continue
+                    dx, dy = world.delta(x, y, o.x, o.y)
+                    if dx * dx + dy * dy <= r2:
+                        n += 1
+        return n
+
     def query(self, x: float, y: float, radius: float, world, exclude_id: int = -1) -> list:
         """radius icindeki ajanlar (kendisi haric), deterministik sirada."""
         span = int(math.ceil(radius / self.cell))

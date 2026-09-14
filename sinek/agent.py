@@ -113,6 +113,10 @@ class Agent:
     #: YANLIS bireyi gosterir (gecmis anlamsizlasir). `id` dokunulmaz kalir —
     #: ajan sirasi ve determinizm ona bagli.
     mem_id: int = -1
+    #: Faz 8: yogunluga bagli secilimin baktigi etiket. Asil kolda soyismin
+    #: kendisi, karistirma kontrolunde permute edilmis hali — ceza BUNA bakar,
+    #: `genome.surname` degismeden kalir (olcumler onu okur).
+    crowd_label: int = -1
     #: Faz 5 DEFTERI — partner kimligi -> gecmis etkilesimlerin net isareti.
     #: ALICI kaydeder: birinden enerji aldiysa +, biri saldirdiysa -.
     #: Kapasite sinirlidir; dolunca en zayif (|deger| en kucuk) kayit atilir.
