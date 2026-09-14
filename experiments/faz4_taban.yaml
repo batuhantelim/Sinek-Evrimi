@@ -22,6 +22,10 @@
 run:
   name: faz4_taban
   steps: 12000
+  # TOHUM (Faz 7'de config anahtari oldu): bu deney TAZE degil, bu kayitli
+  # koloniyle kuruldu. Varsayilan TAZE'ye dondugu icin burada ACIKCA
+  # yazilir — yoksa dosya sessizce baska bir deneye donusur.
+  load_genomes: docs/faz4tani/population_taban.npz
 agents:
   motors:
     max_speed: 0.20

@@ -327,6 +327,21 @@ class TestBasinMap(unittest.TestCase):
         sec["rules"]["kinship"]["radius"] = haf["rules"]["kinship"]["radius"]
         self.assertEqual(_mechanics(sec), _mechanics(haf))
 
+    def test_phase7_changes_only_the_seed_and_immigration(self):
+        """Faz 7'nin iddiasi: 'rejim Faz 4.5 temiz ekolojisiyle ayni, yalnizca
+        tohum (TAZE) ve gocmen orani farkli'. Ucuncu bir fark sizarsa taze
+        zeminde olculen sonuc eskisiyle KIYASLANAMAZ hale gelir."""
+        taze = load_config(os.path.join(ROOT, "experiments", "faz7_taze.yaml")).to_dict()
+        eko = load_config(os.path.join(ROOT, "experiments", "faz45_ekoloji.yaml")).to_dict()
+        # Tohum: biri TAZE, oteki kayitli koloni — ikisi de ACIKCA yaziyor.
+        self.assertIsNone(taze["run"]["load_genomes"])
+        self.assertTrue(eko["run"]["load_genomes"])
+        # Gocmen: yalnizca taze zeminde acik.
+        self.assertGreater(taze["evolution"]["immigration_rate"], 0.0)
+        self.assertEqual(eko["evolution"]["immigration_rate"], 0.0)
+        taze["evolution"]["immigration_rate"] = eko["evolution"]["immigration_rate"]
+        self.assertEqual(_mechanics(taze), _mechanics(eko))
+
     def test_predator_is_off(self):
         cfg = load_config(
             overrides=seed_sweep.FIXED + seed_sweep.REGIME + [basin_map.PREDATOR_OFF]

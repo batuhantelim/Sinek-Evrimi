@@ -16,6 +16,10 @@
 run:
   name: faz6_secim
   steps: 12000
+  # TOHUM (Faz 7'de config anahtari oldu): bu deney TAZE degil, bu kayitli
+  # koloniyle kuruldu. Varsayilan TAZE'ye dondugu icin burada ACIKCA
+  # yazilir — yoksa dosya sessizce baska bir deneye donusur.
+  load_genomes: docs/faz5/population_hafiza.npz
 agents:
   max_count: 5000
   motors:

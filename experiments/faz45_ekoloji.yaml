@@ -23,6 +23,10 @@
 run:
   name: faz45_ekoloji
   steps: 12000
+  # TOHUM (Faz 7'de config anahtari oldu): bu deney TAZE degil, bu kayitli
+  # koloniyle kuruldu. Varsayilan TAZE'ye dondugu icin burada ACIKCA
+  # yazilir — yoksa dosya sessizce baska bir deneye donusur.
+  load_genomes: docs/faz4tani/population_taban.npz
 agents:
   max_count: 5000        # bağlayıcı DEĞİL; koloni ~744'te kendiliğinden durur
   motors:

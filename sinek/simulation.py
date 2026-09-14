@@ -107,6 +107,9 @@ class Simulation:
         self.kin_radius = float(cfg.get("rules.kinship.radius", 2.5))
         self.kin_control = str(cfg.get("rules.kinship.control", "none"))
         self.split_rate = float(cfg.get("rules.kinship.split_rate", 0.0))
+        # Faz 7: dogumlarin bu oraninda yavru TAZE bir kurucu genomla dogar.
+        # 0.0 = Faz 1-6 davranisi (hicbir rng cekimi yapilmaz, hash birebir ayni).
+        self.immigration_rate = float(cfg.get("evolution.immigration_rate", 0.0))
         if self.kin_control not in ("none", "shuffle_surnames", "random_surname_at_birth", "scatter_offspring"):
             raise ValueError(f"bilinmeyen rules.kinship.control={self.kin_control!r}")
         # --- Faz 5: tanima + hafiza ---
@@ -346,6 +349,26 @@ class Simulation:
                     a.x, a.y, math.cos(ang) * radius, math.sin(ang) * radius
                 )
             genome = a.genome.child(cfg, self.rng)
+            # FAZ 7 — GOCMEN: yavrunun genomu ebeveynden degil TAZE bir
+            # kurucudan gelir ve yeni bir soyisim alir. Soylar yalnizca
+            # tukenebildigi icin (yeni kurucu yoktu) etkin soy sayisi Faz 6'da
+            # ~1'e inmisti; bu, "grup-ici vs grup-disi" olcmeyi imkansiz
+            # kiliyor. `split_rate` yalnizca ETIKET uretir (bolunen soy
+            # bolundugu anda ebeveyniyle genetik olarak AYNIDIR); gocmen
+            # GENETIK cesitlilik uretir.
+            #
+            # ENERJI DEFTERI: gocmen bir DOGUMUN yerine gecer — ebeveyn ayni
+            # maliyeti oder, yavru ayni `child_energy` ile baslar. Yani
+            # koloniye enerji EKLEMEZ (disaridan birey enjekte etmek eklerdi).
+            # Bedeli seçilimdedir, enerjide degil: uygun bir ebeveynin yavrusu
+            # `immigration_rate` olasilikla acemi cikar. Bu bedel olculur.
+            immigrant = (
+                self.immigration_rate > 0.0
+                and self.rng.random() < self.immigration_rate
+            )
+            if immigrant:
+                genome = self.founder.diversified(cfg, self.rng, 1.0)
+                self.stats_step["immigrants"] += 1
             if self.kin_control == "random_surname_at_birth":
                 # KONTROL: etiket birey icin sabit ama KALITSAL DEGIL.
                 # Etiket YASAYAN populasyondan cekilir (0..N araligindan degil):
@@ -355,6 +378,13 @@ class Simulation:
                 # in-group orani olculemeyecek kadar gurultulu olur.
                 donor = self.agents[int(self.rng.integers(0, len(self.agents)))]
                 genome.surname = donor.genome.surname
+            elif immigrant:
+                # Gocmen tanim geregi yeni bir soydur. Kontrol kolunda ise
+                # etiketi yine yasayan populasyondan gelir (yukaridaki dal):
+                # kontrol BILGIYI siler, GOCU degil — iki kolda gocmen sayisi
+                # ve genetik etkisi ayni kalir.
+                genome.surname = self._next_surname
+                self._next_surname += 1
             elif self.split_rate > 0.0 and self.rng.random() < self.split_rate:
                 # Soy bolunmesi: nadiren yeni bir soyisim dogar.
                 # Soylar suruklenmeyle tukendigi icin (kurucu sayisi sadece
@@ -452,7 +482,7 @@ class Simulation:
         # Faz 4 avlanma muhasebesi + koloni sagligi (D/C ayrimi bunlara bakar).
         for key in ("deaths", "births", "death_starved", "death_old_age",
                     "death_predator", "predator_strikes", "predator_kills",
-                    "repro_blocked"):
+                    "repro_blocked", "immigrants"):
             row[key] = int(acc.get(key, 0))
         # KISI BASI hizlar. `food_fill` bir ORANDIR ve kapasiteye bagimlidir;
         # kosullar arasi kiyaslanamaz (eksen B dersi). Bunlar ajan-adim basina
@@ -896,6 +926,7 @@ def _as_dict(node) -> dict:
 def _empty_stats() -> dict:
     return {
         "births": 0,
+        "immigrants": 0,        # Faz 7: taze kurucu genomla dogan yavru sayisi
         "deaths": 0,
         "repro_blocked": 0,   # tavan yuzunden yanan ureme hakki (Faz 4.5)
         "death_starved": 0,

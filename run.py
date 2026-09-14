@@ -64,6 +64,19 @@ def parse_args(argv=None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
+def resolve_seed(args: argparse.Namespace, cfg):
+    """TOHUM cozumlemesi: CLI > config > TAZE.
+
+    Faz 7'ye kadar tohum yalnizca bir CLI bayragiydi; hangi deneyin neyle
+    tohumlandigi deney dosyasinda degil komut satirinda duruyordu ve zincirleme
+    fiilen varsayilan olmustu. Her tohumlama cesitliligi bir kademe daralttigi
+    icin Faz 6'da etkin soy ~1'e inmisti (bkz. docs/faz7/).
+    """
+    path = args.load_genomes or cfg.get("run.load_genomes", None)
+    top = args.load_top if args.load_top is not None else cfg.get("run.load_top", None)
+    return path, top
+
+
 def build_config(args: argparse.Namespace):
     cfg = load_config(args.config, args.overrides)
     if args.seed is not None:
@@ -105,14 +118,23 @@ def main(argv=None) -> int:
     os.makedirs(out_dir, exist_ok=True)
     cfg.dump(os.path.join(out_dir, "config_used.yaml"))
 
+    # TOHUM: CLI > config > TAZE. Faz 7'ye kadar tohum yalnizca bir CLI
+    # bayragiydi, dolayisiyla "hangi deney neyle tohumlandi" bilgisi deney
+    # dosyasinda degil komut satirinda duruyordu ve zincirleme fiilen
+    # varsayilan olmustu. Artik deney dosyasi kendi tohumunu yazar; varsayilan
+    # TAZE'dir (bkz. docs/faz7/olcut.md Bolum 2).
+    seed_path, top = resolve_seed(args, cfg)
     seed_genomes = None
-    if args.load_genomes:
-        seed_genomes, seed_meta = load_population(args.load_genomes, cfg, top=args.load_top)
+    if seed_path:
+        seed_genomes, seed_meta = load_population(seed_path, cfg, top=top)
         if not args.quiet:
             print(
-                f"   tohum: {len(seed_genomes)} genom <- {args.load_genomes} "
+                f"   tohum: {len(seed_genomes)} genom <- {seed_path} "
                 f"(nesil {seed_meta['generation']}, beyin {seed_meta['brain_type']})"
+                + (f" | tasima: {seed_meta['migrated']}" if seed_meta.get("migrated") else "")
             )
+    elif not args.quiet:
+        print("   tohum: TAZE (rastgele 0. nesil, her kurucuya benzersiz soyisim)")
 
     sim = Simulation(cfg, initial_genomes=seed_genomes)
     metrics = Metrics(cfg, out_dir, sim.founder.params.keys())

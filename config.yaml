@@ -16,6 +16,13 @@ run:
   steps: 12000          # toplam simulasyon adimi
   log_every: 2000       # terminale ozet basma sikligi (adim)
   stop_if_extinct: true # populasyon 0'a duserse erken bitir
+  # TOHUM (Faz 7): bos = TAZE baslangic (rastgele 0. nesil, her kurucuya
+  # benzersiz soyisim). Bir yol verilirse o kayitli koloniyle baslanir.
+  # `--load-genomes` bunu ezer. Faz 1-6'da tohum yalnizca CLI'daydi ve
+  # zincirleme fiilen varsayilan olmustu; her tohumlama cesitliligi bir kademe
+  # daralttigi icin Faz 6'da etkin soy ~1'e inmisti (bkz. docs/faz7/).
+  load_genomes: null
+  load_top: null
 
 world:
   # FAZ 3 daha genis bir dunya kullanir (Faz 1/2: 160x100).
@@ -155,6 +162,20 @@ evolution:
   # 0.0 -> herkes kurucu genomun klonu (Faz 1)
   # 1.0 -> parametreler dagilir, sinir aglari tamamen bagimsiz rastgele
   founder_spread: 1.0
+
+  # FAZ 7 — GOCMEN ORANI: dogumlarin bu oraninda yavrunun genomu ebeveynden
+  # DEGIL, taze bir kurucudan gelir (founder_spread = 1 ile uretilir) ve yeni
+  # bir soyisim alir. Soylar yalnizca tukenebildigi icin etkin soy sayisi uzun
+  # kosumlarda ~1'e iniyordu; `split_rate` bunu ETIKET duzeyinde onaruyor ama
+  # bolunen soy bolundugu anda ebeveyniyle genetik olarak AYNI. Gocmen GENETIK
+  # cesitlilik uretir.
+  #
+  # Enerji notu: gocmen bir DOGUMUN yerine gecer (ebeveyn ayni maliyeti oder,
+  # yavru ayni enerjiyle baslar) — koloniye enerji EKLEMEZ. Bedeli secilimde:
+  # uygun bir ebeveynin yavrusu bu olasilikla acemi cikar.
+  #
+  # 0.0 = Faz 1-6 davranisi (hicbir rastgele cekim yapilmaz; hash birebir ayni).
+  immigration_rate: 0.0
   founder_param_sigma: 0.25
 
   # --- mutasyon ---
