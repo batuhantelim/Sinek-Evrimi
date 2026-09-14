@@ -767,6 +767,96 @@ başlayamıyor olabilir.
 
 ---
 
+## 3.12 Faz 7: çeşitlilik denetimi
+
+Tam rapor: **[docs/faz7/cesitlilik.md](docs/faz7/cesitlilik.md)**
+Ölçüt (koşumlardan önce yazıldı): **[docs/faz7/olcut.md](docs/faz7/olcut.md)**
+
+### Ölçüt 1B — bir koşum "ölçülebilir çeşitlilikte" ne zaman sayılır
+
+Son çeyrekte **etkin soy ≥ 5.0** *ve* **dış-grup fırsat payı ≥ %10**.
+`tools/diversity_report.py` bunu uygular, ayrıca etiket/genom çeşitliliğini ve
+çeşitliliğin bedelini (korunum, kişi başı toplama, tavan, tükenme) ayrı yazar.
+
+### ⚠⚠ Taze başlangıç çeşitliliği KORUMUYOR — tam tersi
+
+Beklenti "zincirleme tohumlama çeşitliliği daralttı"ydı. Ölçüm tersini söyledi:
+
+| | etkin soy | dış-grup payı |
+|---|---|---|
+| tohumlu (`population_taban.npz`) | **13.95 / 8.92** | **%53.6 / %42.9** |
+| **taze** (rastgele 0. nesil) | 1.33 / 1.02 | %2.6 / %0.5 |
+
+Taze kolda en büyük soy **ilk 500 adımda** %32'ye, 12000'de %99'a çıkıyor.
+Bu sürüklenme değil **seçilim süpürgesi**: rastgele ağlardan birkaçı çalışan
+bir kemotaksis devresine sahiptir ve hepsini alır. Sıfırdan evrim = güçlü
+yönlü seçilim = soy çeşitliliğinin silinmesi.
+
+2×2 (tohum × hafıza) nedeni ayrıştırdı: belirleyen **tohum popülasyonu**,
+mekanik değil (taban → 13.95/9.47; ekoloji → 2.56/2.96).
+
+**Sıralama ters**: başlangıçtaki genom çeşitliliği ne kadar yüksekse soy
+çeşitliliği o kadar hızlı çöküyor (taban 0.2553 → 13.95; ekoloji 0.3683 → 2.56;
+taze en geniş → 1.33). Üç nokta, hipotez. Rahatsız edici sonucu: bu tasarımda
+**etiket çeşitliliği ile genom çeşitliliği birbirini iter.**
+
+### Göçmen mekaniği (`evolution.immigration_rate`)
+
+Doğumların bu oranında yavrunun genomu ebeveynden **değil** taze bir kurucudan
+gelir ve yeni soy açar. `split_rate`'ten farkı: o **etiket**, bu **genom**
+üretir.
+
+- **Enerji defteri temiz**: göçmen bir **doğumun yerine geçer** — ebeveyn aynı
+  maliyeti öder, yavru aynı enerjiyle başlar; test üreme öncesi/sonrası enerji
+  farkının iki kolda birebir aynı olduğunu sabitler.
+- **0.0'da hiçbir rastgele çekim yapılmaz** → Faz 1–6 `state_hash`'leri birebir
+  korunur (test).
+- Karıştırma kontrolünde göçmen **durmaz**, yalnızca etiketi yaşayan
+  popülasyondan gelir: kontrol **bilgiyi** siler, **göçü** değil.
+
+**Sonuç: süpürgeyi durdurmuyor.** Altı oran (0.0–0.10), 0/6 ölçütü geçti;
+doğumların onda biri taze kurucu olsa bile etkin soy 1.71'de kalıyor. Yeni soy
+**açılıyor** (soy sayısı 6.2 → 15.2) ama **tutunamıyor**. Bedeli ölçüldü:
+kişi başı toplama −24%.
+
+### Denetim sonucu: iki negatif zaten geçerli zemindeydi
+
+| faz | etkin soy | dış-grup payı | ölçüt 1B |
+|---|---|---|---|
+| Faz 4.5 akrabalık testi (5 seed) | 1.86–12.15 | %9.5–57.7 | **4/5 GEÇTİ** |
+| Faz 4.6 kontrollü evrim (BC6) | 11.18 / 13.17 | %14.5 / %18.7 | GEÇTİ |
+| Faz 4.6 `BC10` kolu | 5.94 | %3.0 | GEÇMEDİ |
+| Faz 5 hafızalı | 1.03 | %0.4 | **GEÇMEDİ** |
+| Faz 6 seçim | 1.00 | %0.1 | **GEÇMEDİ** |
+
+Yani **akrabalık negatifi çeşitlilik artefaktı değil**; taze zeminde tekrar
+etmek ölçülebilirliği *düşürürdü*. Faz 5 ve Faz 6 ise geçerli zeminde
+(`taban` tohumu) tekrarlandı:
+
+- **Faz 5**: karşılıklılık 1/5 ayrıştı (eski 0/5), misilleme 2/5 (ölçüt ≥4/5).
+  Soy çeşitliliği 8×, dış-grup payı 34× arttığı hâlde yön tutarsız. **Negatif
+  ayakta.**
+- **Faz 6**: verdict aynı (banttan çıkma 1/5; rastgele seçim 3/5 seed'de
+  aynısını yapıyor). Değişen **ölçülebilirlik**: dış-grup payı %0.1 → %17–41 ve
+  Faz 6'da "OKUNMAZ" diye bayraklanan akrabalık kanadı artık okunuyor —
+  evrimleşen politika rastgeleden daha sık akraba seçiyor (4/5 seed) ama en
+  yakından daha az.
+
+Yan bulgu: **seçim mekaniğinin kendisi** soy çeşitliliğini düşürüyor (seçim
+kolu 2.41–5.23, seçimsiz 8.97–13.42) — dışlama süpürgeyi hızlandırıyor.
+
+### Tohum artık config anahtarı
+
+`run.load_genomes` (CLI `--load-genomes` ezer), varsayılan **TAZE**. Tohumla
+kurulmuş eski deney dosyaları kendi tohumunu **açıkça** yazar; test bunu zorlar
+(`test_old_experiments_declare_their_own_seed`) — yoksa varsayılan değişince
+sessizce başka bir deneye dönüşürlerdi.
+
+⚠ **Ama pratikte "taze" doğru varsayılan değil**: ölçülebilir soy çeşitliliği
+isteyen bir deney `docs/faz4tani/population_taban.npz` tohumuyla kurulmalı.
+
+---
+
 ## 4. Nasıl çalıştırılır
 
 ```bash
@@ -777,7 +867,7 @@ python run.py --steps 2000 --viz none    # sadece metrik, en hızlısı
 python run.py --viz pygame               # canlı pencere (SPACE: duraklat, Q: çık)
 python run.py --seed 7 --name deney7
 python run.py --check-determinism
-python -m unittest discover -s tests     # 149 test
+python -m unittest discover -s tests     # 164 test
 ```
 
 Hazır deneyler (`experiments/README.md`):
@@ -842,6 +932,21 @@ python tools/exclusion_probe.py --steps 3000 --control none \
   --load runs/f6_secim_s42/population.npz
 python tools/exclusion_probe.py --steps 3000 --control random \
   --load runs/f6_secim_s42/population.npz
+```
+
+Faz 7 (çeşitlilik denetimi; her koşumdan önce zemininizi ölçün):
+
+```bash
+# Bir kosum "olculebilir cesitlilikte" mi? (etkin soy >= 5, dis-grup >= %10)
+python tools/diversity_report.py runs/f45_s42_asil runs/f5_hafizali_s42
+
+# Taze zemin + gocmen (olculdu: ikisi de cesitliligi KORUMUYOR)
+python run.py --config experiments/faz7_taze.yaml --seed 42 \
+  --set evolution.immigration_rate=0.02
+
+# Olculebilir cesitlilik isteyen her deney BU tohumla kurulur:
+python run.py --config experiments/faz5_hafiza.yaml --seed 42 --viz none \
+  --load-genomes docs/faz4tani/population_taban.npz
 ```
 
 Faz 4'ün 2×2'si (dört kol da Faz 2 tohumuyla, her biri kendi kontrolüyle):
@@ -1279,6 +1384,39 @@ Tam tablo: **[docs/faz6/partner_secimi.md](docs/faz6/partner_secimi.md)**
   hücreyi bayraklıyor.
 - Enerji korunumu 15/15 koşumda ve sondada tam.
 
+### Faz 7 — çeşitlilik denetimi (menzil/göçmen taraması + 2×2 + Faz 5/6 tekrarı)
+
+Tam tablo: **[docs/faz7/cesitlilik.md](docs/faz7/cesitlilik.md)**
+
+- **⚠⚠ Premis yanlış çıktı: taze başlangıç çeşitliliği KORUMUYOR.** Tohumlu kol
+  etkin soy 13.95/8.92 ve dış-grup payı %53.6/%42.9 verirken taze kol 1.33/1.02
+  ve %2.6/%0.5. Taze kolda en büyük soy **ilk 500 adımda** %32'ye çıkıyor: bu
+  sürüklenme değil **seçilim süpürgesi**.
+- **Çöküşün nedeni zincirleme değil, tohum popülasyonu.** 2×2 (tohum × hafıza):
+  taban → 13.95/9.47, ekoloji → 2.56/2.96; hafıza neredeyse hiçbir şey yapmıyor.
+  Kaydedilmiş popülasyonların genom çeşitliliği zincir boyunca **azalmıyor**
+  (0.2553 → 0.3683 → 0.2806 → 0.2896).
+- **Etiket çeşitliliği ile genom çeşitliliği birbirini itiyor**: başlangıç genom
+  çeşitliliği ne kadar yüksekse soy çeşitliliği o kadar hızlı çöküyor (3 nokta,
+  hipotez). Faz 4.5'te seçilim zincirini onarmamız, Faz 5/6 zemininin çökmesinin
+  muhtemel nedeni — iyi bir düzeltme başka bir yerde ölçümü bozmuş.
+- **Göçmen mekaniği (`evolution.immigration_rate`) süpürgeyi durdurmuyor.**
+  0.0–0.10 arası altı oran, **0/6** ölçütü geçti; doğumların onda biri taze
+  kurucu olsa bile etkin soy 1.71. Yeni soy açılıyor (6.2 → 15.2) ama
+  tutunamıyor. Bedel: kişi başı toplama −24%. Enerji korunumu 6/6 koşumda tam.
+- **Akrabalık negatifi ARTEFAKT DEĞİL**: Faz 4.5'in testi 4/5 koşumda ölçütü
+  geçen bir zeminde (etkin soy 5.99–12.15, dış-grup %40–58) yapılmış. Taze
+  zeminde tekrar etmek ölçülebilirliği *düşürürdü*.
+- **Faz 5 geçerli zeminde tekrarlandı, sonuç değişmedi**: karşılıklılık 1/5
+  (eski 0/5), misilleme 2/5 (ölçüt ≥4/5) — soy çeşitliliği 8×, dış-grup payı
+  34× arttığı hâlde.
+- **Faz 6 tekrarında verdict aynı, ölçülebilirlik farklı**: banttan çıkma 1/5
+  (ölçüt ≥4/5) ama dış-grup payı %0.1 → %17–41. Faz 6'da "OKUNMAZ" diye
+  bayraklanan akrabalık kanadı artık okunuyor: politika rastgeleden daha sık
+  akraba seçiyor (4/5 seed), en yakından daha az.
+- Yan bulgu: **seçim mekaniğinin kendisi** soy çeşitliliğini düşürüyor (seçim
+  kolu 2.41–5.23, seçimsiz 8.97–13.42).
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -1343,15 +1481,26 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
    ⚠ (a) her durumda ilk sırada: ölçülebilirlik ölçütü (dış-grup payı ≥ %10)
    Faz 6'da GEÇMEDİ, yani yeni bir sosyal mekanik eklemek yine okunamaz bir
    ölçüm üretir.
-7. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
+7. ✅ **Çeşitlilik denetlendi (§3.12).** Üç negatif de ayakta: akrabalık zaten
+   geçerli zemindeydi, karşılıklılık ve partner seçimi geçerli zeminde
+   tekrarlandı ve değişmedi. Ama iki yeni iş çıktı:
+   (a) **ölçülebilir çeşitliliği koruyan bir mekanizma hâlâ yok** — göçmen
+   0/6 koşulda ölçütü geçemedi; denenmemiş kaldıraçlar: daha geniş dünya /
+   daha çok yama (CLAUDE.md'de ~13 etkin soy verdiği yazılı), uzamsal
+   sığınaklar, yoğunluğa bağlı seçilim;
+   (b) **seçim mekaniği çeşitliliği düşürüyor** (etkin soy 2.4–5.2 vs 9.0–13.4)
+   — Faz 6'nın dışlaması süpürgeyi hızlandırıyor, bu ayrıca incelenmeli.
+8. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
    etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
    etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
    değiştirmek bu kodu bozmaz — kısmi akrabalık isteniyorsa
    `agent.sense`'teki `kin` hesabı sürekli bir orana çevrilir.
-8. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
+9. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
    `(soy_i, soy_j)` matrisine genişletilecek. `stratified_kin_bias`
    `action` parametresiyle zaten genel; hücre başına da uygulanabilir.
-9. Adım 2 tohumu: `docs/faz6/population_secim.npz` (seçimli),
+10. Adım 2 tohumu: ⚠ **ölçülebilir çeşitlilik istiyorsanız
+   `docs/faz4tani/population_taban.npz`** (§3.12); diğerleri:
+   `docs/faz6/population_secim.npz` (seçimli),
    `docs/faz5/population_hafiza.npz` (hafızalı) ya da
    `docs/faz45/population_ekoloji.npz` (hafızasız temiz ekoloji).
    Eski zeminin tabanı `docs/faz4tani/population_taban.npz`, Faz 4 adım 1'in
@@ -1502,4 +1651,23 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
   uzamsal olarak zaten daha akraba ve tekrarlı bitişiklik yüzünden daha sık
   defteri pozitif. Aynı sonda referansa göre **zıt işaret** verebiliyor —
   hangisinin kanıt olduğu önceden yazılır.
+- **ZEMİNİNİZİ ÖLÇÜN, VARSAYMAYIN.** Bir sosyal ölçüm yapmadan önce
+  `tools/diversity_report.py` ile etkin soy ve dış-grup fırsat payını okuyun.
+  Faz 5 ve Faz 6'nın bütün koşumları etkin soy ~1 ve dış-grup payı %0.1–4.6
+  olan bir zeminde üretildi: "grup-içi vs grup-dışı" ölçülürken ortada **tek
+  grup** vardı. Ölçüt: etkin soy ≥ 5.0 **ve** dış-grup payı ≥ %10.
+- **TAZE BAŞLANGIÇ ÇEŞİTLİLİK DEMEK DEĞİLDİR.** Sezgi "rastgele 0. nesil en
+  çeşitlidir" der; ölçüm tersini söyledi. Rastgele ağlardan birkaçı çalışan bir
+  devreye sahiptir ve **ilk 500 adımda** hepsini alır (en büyük soy %32 → %99).
+  Sıfırdan evrim güçlü yönlü seçilimdir, güçlü yönlü seçilim soy çeşitliliğini
+  siler. Ölçülebilir soy çeşitliliği isteyen deney
+  `docs/faz4tani/population_taban.npz` tohumuyla kurulur.
+- **ETİKET ÇEŞİTLİLİĞİ İLE GENOM ÇEŞİTLİLİĞİ BİRBİRİNİ İTER.** Seçilimin
+  üzerinde çalışacağı varyans ne kadar çoksa süpürge o kadar hızlı. "Hem çok soy
+  hem çok genetik varyans" bir ayar noktası değil, bir gerilim; hangisini
+  ölçtüğünüzü yazın (`lineage_effective` vs `weight_diversity` vs `genetic_r`).
+- **BİR YERİ ONARMAK BAŞKA YERDE ÖLÇÜMÜ BOZABİLİR.** Faz 4.5'te seçilim
+  zincirini onardık (yemek → yavru +0.047 → +0.738); bu, Faz 5/6 zemininde soy
+  çeşitliliğinin çökmesinin muhtemel nedeni. Zemini değiştiren her düzeltmeden
+  sonra yalnızca ana bulguları değil **ölçülebilirliği** de yeniden denetleyin.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.
