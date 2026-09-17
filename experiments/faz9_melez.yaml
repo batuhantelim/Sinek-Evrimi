@@ -29,6 +29,12 @@ agents:
 evolution:
   immigration_rate: 0.0
 rules:
+  kinship:
+    # Faz 9 bileşen 1 İKİLİ akrabalıkla ölçüldü ("en az bir ortak bileşen").
+    # config.yaml varsayılanı `ratio`ya ilerledi; bu dosya kendi rejimini
+    # PİNLER, yoksa eski deney sessizce başka bir deneye dönüşürdü
+    # (proje kuralı: "faz sınırı değiştiğinde eski deney dosyalarını sabitleyin").
+    kin_mode: binary
   hybrid:
     enabled: true
     rate: 0.005

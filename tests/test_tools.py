@@ -374,8 +374,29 @@ class TestBasinMap(unittest.TestCase):
         self.assertTrue(f9["rules"]["crowding"]["enabled"])
         self.assertEqual(f9["rules"]["crowding"]["cost"],
                          f8["rules"]["crowding"]["cost"])
+        # ⚠ IKINCI ve BILINCLI fark: faz9_melez.yaml `kin_mode: binary` PINLER.
+        # config.yaml varsayilani Faz 9 revizesiyle `ratio`ya ilerledi; bilesen
+        # 1 ikili akrabalikla olculdugu icin dosya kendi rejimini sabitliyor.
+        # Bu, Faz 8 zeminini DEGISTIRMEZ: Faz 8'de butun etiketler tek
+        # bilesenlidir ve iki mod orada birebir ayni hash'i verir
+        # (test_phase9.TestContinuousKinIsBackwardCompatible zorlar).
+        self.assertEqual(f9["rules"]["kinship"]["kin_mode"], "binary")
         f9["rules"]["hybrid"] = f8["rules"]["hybrid"]
+        f9["rules"]["kinship"]["kin_mode"] = f8["rules"]["kinship"]["kin_mode"]
         self.assertEqual(_mechanics(f9), _mechanics(f8))
+
+    def test_phase9_continuous_changes_only_the_kin_measure(self):
+        """Faz 9 revizesinin iddiasi: 'bilesen 1 ile TEK farkim akrabaligin
+        surekli okunmasi'. Ucuncu bir fark sizarsa surekli olcunun etkisi
+        baska bir degisiklige karisir."""
+        f9c = load_config(os.path.join(ROOT, "experiments", "faz9_surekli.yaml")).to_dict()
+        f9 = load_config(os.path.join(ROOT, "experiments", "faz9_melez.yaml")).to_dict()
+        self.assertEqual(f9c["rules"]["kinship"]["kin_mode"], "ratio")
+        self.assertEqual(f9["rules"]["kinship"]["kin_mode"], "binary")
+        # Melez ayari birebir ayni olmali: iki kol ayni mandali yasar.
+        self.assertEqual(f9c["rules"]["hybrid"], f9["rules"]["hybrid"])
+        f9c["rules"]["kinship"]["kin_mode"] = f9["rules"]["kinship"]["kin_mode"]
+        self.assertEqual(_mechanics(f9c), _mechanics(f9))
 
     def test_predator_is_off(self):
         cfg = load_config(

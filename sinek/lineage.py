@@ -32,3 +32,45 @@ def kin_labels(s1: int, t1: int, s2: int, t2: int) -> bool:
     if s1 == s2 or s1 == t2:
         return True
     return t1 >= 0 and (t1 == s2 or t1 == t2)
+
+
+#: `kin_ratio` icin gecerli formuller. Bilinmeyen deger sessizce varsayilana
+#: dusmez; cagiran taraf kurulumda dogrular ve yuksek sesle patlar.
+RATIO_MODES = ("jaccard", "mean")
+
+
+def kin_ratio(s1: int, t1: int, s2: int, t2: int, mode: str = "jaccard") -> float:
+    """SUREKLI AKRABALIK: paylasilan bilesen orani, 0.0–1.0.
+
+    Iki formul (docs/faz9/olcut_surekli.md'de koşumlardan once ilan edildi):
+
+    * ``jaccard`` : |kesisim| / |birlesim|
+    * ``mean``    : |kesisim| / (ortalama etiket boyu)
+
+    Tek bilesenli (saf) etiketlerde IKISI DE eski ikili degere indirgenir:
+    ayni soy 1.0, farkli soy 0.0. Faz 1-8'in davranisi bu yuzden birebir
+    korunur (test zorlar).
+
+    ⚠ BU BIR OLCUDUR, DAVRANIS KURALI DEGIL. Deger sensore HAM girer; hicbir
+    yerde "r > x ise paylas" diye bir esik yoktur. Analizde kullanilan
+    dis-grup esigi (`rules.kinship.out_threshold`) yalnizca SINIFLANDIRMA
+    icindir ve ajanin kararina girmez.
+    """
+    if t1 < 0 and t2 < 0:               # iki saf soy: eski ikili davranis
+        return 1.0 if s1 == s2 else 0.0
+    na = 1 if t1 < 0 else 2
+    nb = 1 if t2 < 0 else 2
+    inter = 0
+    if s1 == s2 or (t2 >= 0 and s1 == t2):
+        inter += 1
+    if t1 >= 0 and (t1 == s2 or (t2 >= 0 and t1 == t2)):
+        inter += 1
+    if inter == 0:
+        return 0.0
+    if mode == "jaccard":
+        return inter / (na + nb - inter)
+    if mode == "mean":
+        return 2.0 * inter / (na + nb)
+    raise ValueError(
+        f"bilinmeyen akrabalik formulu: {mode!r} ({' | '.join(RATIO_MODES)})"
+    )

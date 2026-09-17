@@ -1,0 +1,60 @@
+# FAZ 9 (revize) — SÜREKLİ AKRABALIK: melez zeminini ölçülebilir kılma denemesi.
+#
+# `faz9_melez.yaml` ile TEK farkı `rules.kinship.kin_mode: ratio`. Bileşen 1'de
+# akrabalık "en az bir ortak bileşen" diye ikiliydi; melez payı doyuma
+# tırmanınca neredeyse herkes herkese akraba oldu ve dış-grup fırsat payı
+# 2/3 seed'de %10'un altına düştü (docs/faz9/melez.md).
+#
+# Sürekli ölçüde `{A,B}` ile `{B,C}` artık 1.0 değil, 1/3 (jaccard) akrabadır.
+# Değer sensöre HAM girer (2r-1); hiçbir yerde eşik yoktur. Analizde kullanılan
+# dış-grup eşiği (`out_threshold: 0.5`) SALT SINIFLANDIRMA içindir ve koşumdan
+# önce ilan edilmiştir (docs/faz9/olcut_surekli.md).
+#
+# Kollar (hepsi aynı seed, aynı rejim):
+#   surekli     (bu dosya)
+#   ikili       --config experiments/faz9_melez.yaml   (bileşen 1'in birebir tekrarı)
+#   melezyok    --set rules.hybrid.enabled=false
+#   karistirma  --set rules.kinship.control=shuffle_surnames
+#
+#   python run.py --config experiments/faz9_surekli.yaml --seed 42
+run:
+  name: faz9_surekli
+  steps: 12000
+  load_genomes: null      # TAZE — açıkça yazılır
+agents:
+  max_count: 5000
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+evolution:
+  immigration_rate: 0.0
+rules:
+  kinship:
+    kin_mode: ratio
+    ratio: jaccard        # kalibrasyonla seçilir (tools/kin_ratio_probe.py)
+    out_threshold: 0.5    # SALT ANALİZ eşiği — davranış kuralı DEĞİL
+  hybrid:
+    enabled: true
+    rate: 0.005
+    radius: 5.0
+  crowding:
+    enabled: true
+    radius: 5.0
+    cost: 0.30
+    control: none
+  partner:
+    enabled: false
+  memory:
+    enabled: false
+  predator:
+    enabled: false
+  share:
+    need_bonus: 3.0
+    need_mode: fitness
+  attack:
+    enabled: true
+viz:
+  color_by: lineage
+  every: 50

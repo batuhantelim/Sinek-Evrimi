@@ -66,6 +66,7 @@ BASE_COLUMNS = [
     "opph_pk", "opph_hyb", "opph_nn",   # uc hucrenin firsat sayilari
     "coop_pure_kin", "coop_hybrid_kin", "coop_out",   # P(paylas | hucre)
     "atk_pure_kin", "atk_hybrid_kin", "atk_out",      # P(saldir | hucre)
+    "kin_r_mean",         # Faz 9 revize: firsatlarin ORTALAMA akrabalik orani
     "hyb_share_adj",      # MELEZ akrabaya paylasim - SAF akrabaya (katmanli)
     "hyb_atk_adj",        # ayni sey saldirida
     "hyb_share_vs_out_adj",  # melez akrabaya paylasim - YABANCIYA (katmanli)
@@ -504,6 +505,11 @@ def social_rates(stats: dict) -> dict[str, float]:
         # kendi KARISTIRMA kontroluna karsi okunur (Faz 3'ten beri ayni kural).
         "hybrid_births": int(stats.get("hybrid_births", 0)),
         "opp_hybrid": int(stats.get("opp_hybrid", 0)),
+        # Faz 9 (revize): SUREKLI akrabaligin dagilimi. `opp_kin` esikten SONRA
+        # sayilir; bu sutun esikten ONCEKI ham ortalamadir — ikisi birlikte
+        # esigin nereye dustugunu gosterir.
+        "kin_r_mean": round(
+            _ratio(stats.get("kin_r_sum", 0.0), stats.get("kin_r_pairs", 0)), 5),
         "opph_pk": int(stats.get("opph_pk", 0)),
         "opph_hyb": int(stats.get("opph_hyb", 0)),
         "opph_nn": int(stats.get("opph_nn", 0)),

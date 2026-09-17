@@ -18,12 +18,20 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .brains import genome_size_for
-from .lineage import kin_labels, label_key
+from .lineage import kin_labels, kin_ratio, label_key
 
 
 def kin_of(g1: "Genome", g2: "Genome") -> bool:
     """Iki genomun etiketleri akraba mi (bkz. `lineage.kin_labels`)."""
     return kin_labels(g1.surname, g1.surname2, g2.surname, g2.surname2)
+
+
+def kin_r_of(g1: "Genome", g2: "Genome", mode: str = "jaccard") -> float:
+    """SUREKLI akrabalik orani (Faz 9 revize, bkz. `lineage.kin_ratio`).
+
+    Saf soylarda `kin_of` ile birebir ayni sonucu verir (1.0 / 0.0).
+    """
+    return kin_ratio(g1.surname, g1.surname2, g2.surname, g2.surname2, mode)
 
 
 @dataclass

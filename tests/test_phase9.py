@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sinek.config import load_config
 from sinek.genome import Genome, kin_of
-from sinek.lineage import kin_labels, label_key
+from sinek.lineage import RATIO_MODES, kin_labels, kin_ratio, label_key
 from sinek.metrics import lineage_stats, social_rates, stratified_kin_bias
 from sinek.simulation import Simulation
 
@@ -215,3 +215,158 @@ class TestShuffleControlCarriesBothComponents(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ===================================================================
+#  FAZ 9 (revize) — SUREKLI AKRABALIK
+#  Olcut: docs/faz9/olcut_surekli.md (kosumlardan ONCE yazildi)
+# ===================================================================
+
+class TestContinuousKinAlgebra(unittest.TestCase):
+    def test_pure_labels_reduce_to_the_old_binary_value(self):
+        """GERIYE DONUK UYUM'un cekirdegi: saf soylarda iki formul de
+        eski ikili degeri verir (1.0 / 0.0)."""
+        for mode in RATIO_MODES:
+            self.assertEqual(kin_ratio(3, -1, 3, -1, mode), 1.0)
+            self.assertEqual(kin_ratio(3, -1, 4, -1, mode), 0.0)
+
+    def test_declared_values_match_the_criteria_doc(self):
+        """Olcut dosyasinda ilan edilen sayilar (tablo) birebir tutmali."""
+        self.assertAlmostEqual(kin_ratio(1, 2, 2, 3, "jaccard"), 1 / 3)
+        self.assertAlmostEqual(kin_ratio(1, 2, 2, 3, "mean"), 0.5)
+        self.assertAlmostEqual(kin_ratio(1, -1, 1, 2, "jaccard"), 0.5)
+        self.assertAlmostEqual(kin_ratio(1, -1, 1, 2, "mean"), 2 / 3)
+        for mode in RATIO_MODES:
+            self.assertEqual(kin_ratio(1, 2, 1, 2, mode), 1.0)
+            self.assertEqual(kin_ratio(1, 2, 3, 4, mode), 0.0)
+
+    def test_ratio_is_symmetric_and_bounded(self):
+        cases = [(1, 2, 2, 3), (1, -1, 1, 2), (1, 2, 3, 4), (5, -1, 5, -1)]
+        for mode in RATIO_MODES:
+            for s1, t1, s2, t2 in cases:
+                r = kin_ratio(s1, t1, s2, t2, mode)
+                self.assertEqual(r, kin_ratio(s2, t2, s1, t1, mode))
+                self.assertGreaterEqual(r, 0.0)
+                self.assertLessEqual(r, 1.0)
+
+    def test_unknown_formula_raises(self):
+        """Faz siniri kurali: bilinmeyen deger sessizce varsayilana dusmez."""
+        with self.assertRaises(ValueError):
+            kin_ratio(1, 2, 2, 3, "kosinus")
+        with self.assertRaises(ValueError):
+            make(rules__kinship__ratio="kosinus")
+        with self.assertRaises(ValueError):
+            make(rules__kinship__kin_mode="belki")
+
+
+class TestContinuousKinIsBackwardCompatible(unittest.TestCase):
+    """OLCUT A — geriye donuk uyum. Bu gecmeden hicbir kosum baslatilmaz."""
+
+    def test_pure_population_is_byte_identical_in_both_modes(self):
+        """Melez kapaliyken butun etiketler saf -> iki mod OZDES olmali.
+        Faz 1-8'in her taban cizgisi bu garantiye dayanir."""
+        for ratio in RATIO_MODES:
+            a = make(steps=250, agents__initial_count=120, seed=5,
+                     rules__kinship__kin_mode="binary")
+            b = make(steps=250, agents__initial_count=120, seed=5,
+                     rules__kinship__kin_mode="ratio",
+                     rules__kinship__ratio=ratio)
+            self.assertEqual(a.state_hash(), b.state_hash(), f"ratio={ratio}")
+
+    def test_binary_mode_reproduces_component_one(self):
+        """Melez ACIKKEN `binary` kolu bilesen 1'in davranisini birebir verir
+        (iki kol arasindaki tek fark akrabaligin surekli okunmasi olsun)."""
+        ov = dict(steps=300, agents__initial_count=150, seed=7,
+                  rules__hybrid__enabled=True, rules__hybrid__rate=0.3)
+        a = make(rules__kinship__kin_mode="binary", **ov)
+        b = make(rules__kinship__kin_mode="binary", **ov)
+        self.assertEqual(a.state_hash(), b.state_hash())
+        c = make(rules__kinship__kin_mode="ratio", **ov)
+        # Melez varken iki mod AYRISMALI — yoksa surekli olcu olu demektir
+        # (Faz 6 dersi: "mekanik sessizce olu kalabilir").
+        self.assertNotEqual(a.state_hash(), c.state_hash())
+
+    def test_old_experiment_pins_binary(self):
+        """faz9_melez.yaml kendi rejimini pinlemeli: config varsayilani
+        ilerledi diye eski deney baska bir deneye donusmemeli."""
+        cfg = load_config(os.path.join(os.path.dirname(__file__), "..",
+                                       "experiments", "faz9_melez.yaml"))
+        self.assertEqual(cfg.get("rules.kinship.kin_mode"), "binary")
+        cfg2 = load_config(os.path.join(os.path.dirname(__file__), "..",
+                                        "experiments", "faz9_surekli.yaml"))
+        self.assertEqual(cfg2.get("rules.kinship.kin_mode"), "ratio")
+        self.assertEqual(cfg2.get("rules.kinship.out_threshold"), 0.5)
+
+    def test_continuous_kin_conserves_energy(self):
+        sim = make(steps=400, agents__initial_count=150, seed=4,
+                   rules__kinship__kin_mode="ratio",
+                   rules__hybrid__enabled=True, rules__hybrid__rate=0.3,
+                   rules__share__need_bonus=3.0)
+        self.assertAlmostEqual(sim.stats_total["energy_created"], 0.0, places=6)
+
+
+class TestContinuousKinIsAMeasureNotARule(unittest.TestCase):
+    """KRITIK: sensor HAM orani tasir; esik yalnizca ANALIZDE kullanilir."""
+
+    def test_sensor_carries_the_raw_ratio(self):
+        from sinek.agent import S
+        sim = make(agents__initial_count=40, seed=2,
+                   rules__kinship__kin_mode="ratio")
+        a, b = sim.agents[0], sim.agents[1]
+        a.genome.surname, a.genome.surname2 = 1, 2
+        b.genome.surname, b.genome.surname2 = 2, 3
+        b.x, b.y = a.x + 0.3, a.y
+        a.nearest = b
+        s = a.sense(sim.world, sim.physics)
+        # {1,2} vs {2,3} jaccard = 1/3 -> sensor 2r-1 = -1/3. Ne +1 ne -1:
+        # ARADA bir deger, yani esiksiz.
+        self.assertAlmostEqual(float(s[S["kin"]]), 2 / 3 - 1, places=5)
+
+    def test_threshold_never_enters_a_behaviour_branch(self):
+        """`kin_out_threshold` kaynakta yalnizca OLCUM/siniflandirma
+        satirlarinda gecmeli: paylasim/saldiri esigine, motor karsilastirmasina
+        ya da hedef secimine girmemeli."""
+        path = os.path.join(os.path.dirname(__file__), "..", "sinek", "simulation.py")
+        with open(path, encoding="utf-8") as fh:
+            src = fh.read()
+        body = src.split("def _apply_social_rules(")[1].split("\n    def ")[0]
+        hits = [l.strip() for l in body.splitlines() if "kin_out_threshold" in l]
+        self.assertEqual(len(hits), 1, f"esik birden fazla yerde: {hits}")
+        self.assertTrue(hits[0].startswith("kin ="), hits[0])
+        # Ve `kin` bu noktadan sonra yalnizca sayaclara/hucre etiketine gider.
+        for line in body.splitlines():
+            t = line.strip()
+            if t.startswith(("if kin", "elif kin", "while kin")):
+                self.fail(f"analiz esigi karar dalina sizmis: {t}")
+
+    def test_partner_score_uses_the_same_scale_as_the_sensor(self):
+        """Secim skoru da HAM orani (2r-1) kullanmali; esik oraya da girmez."""
+        path = os.path.join(os.path.dirname(__file__), "..", "sinek", "simulation.py")
+        with open(path, encoding="utf-8") as fh:
+            src = fh.read()
+        body = src.split("def _choose_partner(")[1].split("\n    def ")[0]
+        self.assertIn("2.0 * self._kin_r(", body)
+        self.assertNotIn("kin_out_threshold", body)
+
+
+class TestContinuousKinMeasurement(unittest.TestCase):
+    def test_kin_r_mean_is_reported(self):
+        sim = make(steps=400, agents__initial_count=150, seed=6,
+                   rules__kinship__kin_mode="ratio",
+                   rules__hybrid__enabled=True, rules__hybrid__rate=0.3)
+        row = social_rates(sim.stats_total)
+        self.assertIn("kin_r_mean", row)
+        self.assertGreaterEqual(row["kin_r_mean"], 0.0)
+        self.assertLessEqual(row["kin_r_mean"], 1.0)
+
+    def test_partial_kin_counts_as_out_group_under_jaccard(self):
+        """Asil tamir: {A,B} ile {B,C} artik YABANCI sayilir (1/3 < 0.5).
+        Bilesen 1'de tam akrabaydi ve 'yabanci' kategorisi bu yuzden eriyordu."""
+        sim = make(agents__initial_count=40, seed=8,
+                   rules__kinship__kin_mode="ratio")
+        self.assertLess(sim._kin_r(g(1, 2), g(2, 3)), sim.kin_out_threshold)
+        self.assertGreaterEqual(sim._kin_r(g(1), g(1, 2)), sim.kin_out_threshold)
+        binary = make(agents__initial_count=40, seed=8,
+                      rules__kinship__kin_mode="binary")
+        self.assertGreaterEqual(binary._kin_r(g(1, 2), g(2, 3)),
+                                binary.kin_out_threshold)

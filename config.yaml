@@ -403,6 +403,24 @@ rules:
     # Yuksek deger etiketin akrabalik BILGISINI bozar -> dusuk tutulmali.
     # Kontrol gruplarina da birebir ayni oranda uygulanir.
     split_rate: 0.010
+    # --- FAZ 9 (revize): AKRABALIK BIR ESIK DEGIL, BIR ORAN ---
+    # Bilesen 1'de akrabalik "en az bir ortak bilesen" diye tanimliydi;
+    # populasyonun yarisi melezken neredeyse herkes herkese akraba oluyor ve
+    # "yabanci" kategorisi eriyor (dis-grup payi 2/3 seedde %10'un altina
+    # dustu — docs/faz9/melez.md). Surekli oran bunu tamir etmeyi dener.
+    #   binary : Faz 3 - Faz 9/bilesen-1 davranisi (ortak bilesen -> +1)
+    #   ratio  : sensore HAM oran girer -> 2r-1
+    # Saf (tek bilesenli) soylarda IKISI OZDESTIR, o yuzden Faz 1-8'in
+    # hash'leri degismez (test zorlar).
+    kin_mode: ratio
+    # Oran formulu. jaccard = |kesisim|/|birlesim|, mean = |kesisim|/ort.boy.
+    # Secim ölçütü koşumlardan once ilan edildi: cift bazinda GENOM
+    # benzerligiyle daha yuksek korelasyon veren (docs/faz9/olcut_surekli.md).
+    ratio: jaccard
+    # ⚠ SALT ANALIZ ESIGI. r < out_threshold => dis-grup (yabanci). Yalnizca
+    # in/out SINIFLANDIRMASINDA kullanilir; ajanin kararina HICBIR YERDE
+    # girmez. Davranis kurali degildir — sensore ham oran gider.
+    out_threshold: 0.5
 
 metrics:
   enabled: true

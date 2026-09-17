@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .lineage import kin_labels
+from .lineage import kin_labels, kin_ratio
 
 # --- Sozlesme: sensor vektoru ------------------------------------------
 SENSOR_NAMES: list[str] = [
@@ -170,8 +170,19 @@ class Agent:
         # kosullandirabilir ama zorunda degil; "akrabaya paylas" davranisi
         # evrimlesirse evrimlesir.
         if self.nearest is not None:
-            s[S["kin"]] = 1.0 if kin_labels(self.nearest.genome.surname, self.nearest.genome.surname2,
-                                    self.genome.surname, self.genome.surname2) else -1.0
+            # FAZ 9 (revize): kanal SUREKLI. r = paylasilan bilesen orani
+            # (0..1) -> sensor 2r-1 ile [-1,+1]'e tasinir. Saf soylarda
+            # r ∈ {0,1} oldugu icin eski +-1 degerleri BIREBIR korunur.
+            # HAM sayi girer: hicbir yerde esik yoktur (olcu, kural degil).
+            if phys.kin_mode == "binary":
+                s[S["kin"]] = 1.0 if kin_labels(
+                    self.nearest.genome.surname, self.nearest.genome.surname2,
+                    self.genome.surname, self.genome.surname2) else -1.0
+            else:
+                s[S["kin"]] = 2.0 * kin_ratio(
+                    self.nearest.genome.surname, self.nearest.genome.surname2,
+                    self.genome.surname, self.genome.surname2,
+                    phys.kin_ratio_mode) - 1.0
             s[S["near_agent"]] = 1.0
             s[S["neighbor_need"]] = min(
                 1.0, max(0.0, 1.0 - self.nearest.energy / phys.energy_max)

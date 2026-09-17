@@ -34,7 +34,8 @@ import numpy as np
 
 from .agent import M, Agent
 from .brains import make_brain
-from .genome import Genome, founder_genome, kin_of
+from .genome import Genome, founder_genome, kin_of, kin_r_of
+from .lineage import RATIO_MODES
 from .physics import Physics
 from .predator import PredatorPack
 from .metrics import (
@@ -131,6 +132,19 @@ class Simulation:
             )
         if self.kin_control not in ("none", "shuffle_surnames", "random_surname_at_birth", "scatter_offspring"):
             raise ValueError(f"bilinmeyen rules.kinship.control={self.kin_control!r}")
+        # --- Faz 9 (revize): akrabalik SUREKLI oran mi, ikili esik mi ---
+        # `binary` Faz 3 - Faz 9/bilesen-1 davranisi. `ratio` sensore HAM oran
+        # verir; saf soylarda ikisi ozdestir (test zorlar).
+        self.kin_mode = str(cfg.get("rules.kinship.kin_mode", "ratio"))
+        if self.kin_mode not in ("binary", "ratio"):
+            raise ValueError(f"bilinmeyen rules.kinship.kin_mode={self.kin_mode!r}")
+        self.kin_ratio_mode = str(cfg.get("rules.kinship.ratio", "jaccard"))
+        if self.kin_ratio_mode not in RATIO_MODES:
+            raise ValueError(f"bilinmeyen rules.kinship.ratio={self.kin_ratio_mode!r}")
+        # ⚠ SALT ANALIZ ESIGI: yalnizca in/out SINIFLANDIRMASINDA kullanilir
+        # (opp_kin / opp_nonkin, uc hucreli melez matrisi). Ajanin kararina
+        # HICBIR YERDE girmez — davranis kurali degildir.
+        self.kin_out_threshold = float(cfg.get("rules.kinship.out_threshold", 0.5))
         # --- Faz 5: tanima + hafiza ---
         self.memory_on = bool(cfg.get("rules.memory.enabled", False))
         self.memory_capacity = max(1, int(cfg.get("rules.memory.capacity", 16)))
@@ -619,8 +633,14 @@ class Simulation:
             if dx * dx + dy * dy > radius2:
                 continue  # hareket ettiler, artik menzilde degil
 
-            kin = kin_of(other.genome, a.genome)
+            # Faz 9 (revize): oran OLCULUR, sinifllandirma SALT ANALIZ esigiyle
+            # yapilir. `kin` buradan sonra yalnizca sayaclara girer; ajanin
+            # karari bu esigi hic gormez (karar sensordeki HAM oranla verilir).
+            kin_r = self._kin_r(other.genome, a.genome)
+            kin = kin_r >= self.kin_out_threshold
             stats["opp_kin" if kin else "opp_nonkin"] += 1
+            stats["kin_r_sum"] += kin_r
+            stats["kin_r_pairs"] += 1
             # Enerji katmani: akrabalar uzamsal kumelendigi icin "en yakini
             # akraba" olmak, zengin bir yamada olmakla — yani paylasacak
             # BUTCEYE sahip olmakla — karisir. Katman icinde karsilastirma
@@ -882,7 +902,8 @@ class Simulation:
         e_max = self.physics.energy_max
         best_i, best_score = 0, None
         for i, (other, d2) in enumerate(pool):
-            kin = 1.0 if kin_of(other.genome, a.genome) else -1.0
+            # Sensorle AYNI olcek: 2r-1 (saf soylarda +-1, yani Faz 6 ile birebir).
+            kin = 2.0 * self._kin_r(other.genome, a.genome) - 1.0
             led = 0.0
             if self.memory_on:
                 bal = a.ledger.get(other.mem_id)
@@ -898,6 +919,16 @@ class Simulation:
                 best_i, best_score = i, score
         self._note_pick(a, pool, best_i)
         return pool[best_i][0]
+
+    def _kin_r(self, g1, g2) -> float:
+        """Iki etiketin akrabalik ORANI (0..1), yurulukteki moda gore.
+
+        `binary` modda eski ikili deger (1.0 / 0.0); `ratio` modda paylasilan
+        bilesen orani. Saf soylarda ikisi AYNI sayiyi verir.
+        """
+        if self.kin_mode == "binary":
+            return 1.0 if kin_of(g1, g2) else 0.0
+        return kin_r_of(g1, g2, self.kin_ratio_mode)
 
     def _pick_pool_reset(self) -> None:
         pass
@@ -917,17 +948,18 @@ class Simulation:
             stats["pick_not_nearest"] += 1
         chosen = pool[idx][0]
         near = pool[0][0]          # politika olmasaydi secilecek olan
-        if kin_of(chosen.genome, a.genome):
+        if self._kin_r(chosen.genome, a.genome) >= self.kin_out_threshold:
             stats["pick_kin"] += 1
         # ⚠ ASIL REFERANS EN YAKIN, havuz ortalamasi DEGIL. Akrabalar uzamsal
         # kumelendigi icin en yakin zaten havuz ortalamasindan daha sik
         # akrabadir; havuza karsi okunan secicilik, politika hic yokken bile
         # +0.05 cikiyor (olculdu). Politikanin KENDI katkisi ancak "secilen vs
         # en yakin" farkiyla izole edilir.
-        if kin_of(near.genome, a.genome):
+        if self._kin_r(near.genome, a.genome) >= self.kin_out_threshold:
             stats["near_kin"] += 1
         stats["pool_kin"] += sum(
-            1 for o, _ in pool if kin_of(o.genome, a.genome)
+            1 for o, _ in pool
+            if self._kin_r(o.genome, a.genome) >= self.kin_out_threshold
         )
         if self.memory_on:
             if a.ledger.get(chosen.mem_id, 0.0) > 0.0:
@@ -1053,6 +1085,8 @@ def _empty_stats() -> dict:
         "crowding_drain": 0.0,  # Faz 8: yogunluk cezasinin yaktigi enerji (GIDER)
         "hybrid_births": 0,     # Faz 9: birlesik etiketle dogan yavru sayisi
         "opp_hybrid": 0,        # Faz 9: en yakini MELEZ olan firsat (ornek buyuklugu)
+        "kin_r_sum": 0.0,       # Faz 9 revize: surekli akrabalik orani toplami
+        "kin_r_pairs": 0,       # ... ve kac firsat uzerinden (ortalama icin)
         **{f"opph_{c}": 0 for c in ("pk", "hyb", "nn")},
         **{f"shr_{c}": 0 for c in ("pk", "hyb", "nn")},
         **{f"atk_{c}": 0 for c in ("pk", "hyb", "nn")},

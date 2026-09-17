@@ -27,6 +27,11 @@ class Physics:
     # --- Faz 5: tanima/hafiza kanali (sicak yolda config agaci dolasilmaz) ---
     memory_enabled: bool
     memory_scale: float
+    # --- Faz 9 (revize): akrabalik SUREKLI mi ikili mi + hangi formul ---
+    #  `binary` Faz 3-9/bilesen-1'in davranisi, `ratio` sureklidir. Saf
+    #  soylarda ikisi ozdestir, o yuzden eski fazlar etkilenmez.
+    kin_mode: str
+    kin_ratio_mode: str
 
     @classmethod
     def from_config(cls, cfg) -> "Physics":
@@ -42,4 +47,6 @@ class Physics:
             max_turn=float(mot.max_turn),
             memory_enabled=bool(cfg.get("rules.memory.enabled", False)),
             memory_scale=max(1e-6, float(cfg.get("rules.memory.scale", 8.0))),
+            kin_mode=str(cfg.get("rules.kinship.kin_mode", "ratio")),
+            kin_ratio_mode=str(cfg.get("rules.kinship.ratio", "jaccard")),
         )
