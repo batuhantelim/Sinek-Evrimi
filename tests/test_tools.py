@@ -24,6 +24,7 @@ import env_sweep  # noqa: E402
 import predator_sweep  # noqa: E402
 import diversity_report  # noqa: E402
 import hybrid_report  # noqa: E402
+import continuous_kin_report  # noqa: E402
 import partner_report  # noqa: E402
 import seed_sweep  # noqa: E402
 
@@ -544,3 +545,46 @@ class TestHybridReport(unittest.TestCase):
             self.assertIn(verdict, doc)
         for verdict in ("DISLAMA", "KOPRU", "FARK YOK"):
             self.assertIn(f'"{verdict}"', tool)
+
+
+class TestContinuousKinReport(unittest.TestCase):
+    """Faz 9 revizesinin esikleri de ONCEDEN ilan edildi
+    (docs/faz9/olcut_surekli.md). Kod ile dosya ayrisirsa iddia coker."""
+
+    def _doc(self) -> str:
+        with open(os.path.join(ROOT, "docs", "faz9", "olcut_surekli.md"),
+                  encoding="utf-8") as fh:
+            return fh.read()
+
+    def test_thresholds_match_the_declared_criteria(self):
+        doc = self._doc()
+        self.assertEqual(continuous_kin_report.OUTGROUP_MIN, 0.10)
+        self.assertEqual(continuous_kin_report.LINEAGE_MIN, 5.0)
+        self.assertEqual(continuous_kin_report.GENETIC_R_MIN, 0.50)
+        self.assertEqual(continuous_kin_report.POP_MIN, 0.50)
+        self.assertEqual(continuous_kin_report.FORAGE_MIN, 0.70)
+        for needle in ("\u2265 %10", "etkin soy \u2265 5.0", "yar\u0131s\u0131n\u0131n",
+                       "%50", "%70"):
+            self.assertIn(needle, doc)
+
+    def test_analysis_threshold_is_declared_in_the_doc_and_config(self):
+        """Dis-grup esigi (r < 0.5) SALT ANALIZ kategorisi olarak ilan edildi;
+        config varsayilani ile dosya ayrisirsa esik sessizce kaymis olur."""
+        doc = self._doc()
+        self.assertIn("out_threshold", doc)
+        self.assertIn("r < 0.5", doc)
+        self.assertEqual(load_config().get("rules.kinship.out_threshold"), 0.5)
+
+    def test_formula_choice_rule_is_written_before_the_runs(self):
+        """Formul, OLCULEBILIRLIK sonucuna gore degil genom korelasyonuna gore
+        secilir — bu kural dosyada yaziyor ve sonda onu uyguluyor."""
+        doc = self._doc()
+        self.assertIn("Pearson", doc)
+        with open(os.path.join(ROOT, "tools", "kin_ratio_probe.py"),
+                  encoding="utf-8") as fh:
+            tool = fh.read()
+        self.assertIn("corrcoef", tool)
+        # Kalibrasyon TARAFSIZ zeminde: aday formul kosumu sekillendirmemeli.
+        self.assertIn("rules.kinship.kin_mode=binary", tool)
+        self.assertEqual(continuous_kin_report.ARMS,
+                         ("melezyok", "ikili", "surekli"))

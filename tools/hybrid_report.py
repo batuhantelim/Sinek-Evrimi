@@ -28,6 +28,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+#: Ana kolun adi kosuma gore degisebilir (Faz 9 revizesinde `surekli`);
+#: yapisi ayni oldugu icin rapor `--main` ile yeniden adlandirilir.
 ARMS = ("melez", "melezyok", "karistirma")
 
 HYBRID_SHARE_MIN = 0.05   # onkosul 1
@@ -70,12 +72,16 @@ def energy_created(run: str) -> float:
     return total
 
 
-def collect(prefix: str, seed: int) -> dict:
-    return {arm: rows(os.path.join("runs", f"{prefix}_{arm}_s{seed}")) for arm in ARMS}
+def collect(prefix: str, seed: int, main: str = "melez") -> dict:
+    names = {"melez": main, "melezyok": "melezyok", "karistirma": "karistirma"}
+    return {
+        arm: rows(os.path.join("runs", f"{prefix}_{names[arm]}_s{seed}"))
+        for arm in ARMS
+    }
 
 
-def report(prefix: str, seeds: list[int]) -> int:
-    data = {s: collect(prefix, s) for s in seeds}
+def report(prefix: str, seeds: list[int], main: str = "melez") -> int:
+    data = {s: collect(prefix, s, main) for s in seeds}
 
     print("=" * 100)
     print("ONKOSUL — melez gercekten olusuyor mu, ornek yeterli mi")
@@ -91,7 +97,7 @@ def report(prefix: str, seeds: list[int]) -> int:
             continue
         usable += 1
         hs, oh = mean(r, "hybrid_share"), mean(r, "opp_hybrid")
-        ec = energy_created(os.path.join("runs", f"{prefix}_melez_s{s}"))
+        ec = energy_created(os.path.join("runs", f"{prefix}_{main}_s{s}"))
         ok = hs >= HYBRID_SHARE_MIN and oh >= OPP_HYBRID_MIN
         pre_ok += ok
         flag = "" if abs(ec) < 1e-6 else "  ⚠GECERSIZ"
@@ -192,8 +198,9 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Faz 9 melez raporu")
     ap.add_argument("--seeds", type=int, nargs="+", default=[42, 7, 123])
     ap.add_argument("--prefix", default="f9", help="runs/<prefix>_<kol>_s<seed>")
+    ap.add_argument("--main", default="melez", help="ana kolun dizin adi")
     args = ap.parse_args(argv)
-    return report(args.prefix, args.seeds)
+    return report(args.prefix, args.seeds, args.main)
 
 
 if __name__ == "__main__":
