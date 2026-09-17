@@ -58,6 +58,15 @@ BASE_COLUMNS = [
     "pool_multi",         # kararlarin kaci >=2 adayliydi (SECIM ONKOSULU)
     "immigrants",         # Faz 7: taze kurucu genomla dogan yavru sayisi
     "crowding_drain",     # Faz 8: yogunluk cezasinin yaktigi enerji (GIDER)
+    "hybrid_share",       # Faz 9: populasyonun kaci MELEZ etiketli
+    "hybrid_births",      # Faz 9: birlesik etiketle dogan yavru sayisi
+    "opp_hybrid",         # Faz 9: en yakini melez olan firsat (ORNEK BUYUKLUGU)
+    "opph_pk", "opph_hyb", "opph_nn",   # uc hucrenin firsat sayilari
+    "coop_pure_kin", "coop_hybrid_kin", "coop_out",   # P(paylas | hucre)
+    "atk_pure_kin", "atk_hybrid_kin", "atk_out",      # P(saldir | hucre)
+    "hyb_share_adj",      # MELEZ akrabaya paylasim - SAF akrabaya (katmanli)
+    "hyb_atk_adj",        # ayni sey saldirida
+    "hyb_share_vs_out_adj",  # melez akrabaya paylasim - YABANCIYA (katmanli)
     "pick_kin_rate",      # secilenin akraba olma orani
     "pool_kin_rate",      # HAVUZDAKI akraba orani (referans)
     "pick_kin_sel",       # secicilik: secilen - EN YAKIN (0 ise politika yok)
@@ -360,7 +369,8 @@ def lineage_stats(agents) -> dict[str, float]:
         return {"lineage_count": 0, "lineage_effective": 0.0, "lineage_largest": 0.0}
     counts: dict[int, int] = {}
     for a in agents:
-        counts[a.genome.surname] = counts.get(a.genome.surname, 0) + 1
+        key = a.genome.label()   # Faz 9: melez KENDI grubudur
+        counts[key] = counts.get(key, 0) + 1
     p = np.array(list(counts.values()), dtype=np.float64) / n
     entropy = float(-(p * np.log(p)).sum())
     return {
@@ -370,6 +380,11 @@ def lineage_stats(agents) -> dict[str, float]:
         # Iyi karismis (uzamsal yapisiz) bir dunyada iki rastgele bireyin ayni
         # soydan olma olasiligi. Assortment'in taban cizgisi.
         "kin_expected": round(float((p * p).sum()), 5),
+        # Faz 9: melez payi. Etiket sayimi melezi KENDI grubu sayar, yani melez
+        # uretmek `lineage_effective`'i tanim geregi yukseltebilir — olcutler
+        # bu yuzden MELEZ-YOK koluna karsi okunur (docs/faz9/olcut.md).
+        "hybrid_share": round(
+            sum(1 for a in agents if a.genome.is_hybrid) / n, 5),
     }
 
 
@@ -477,6 +492,29 @@ def social_rates(stats: dict) -> dict[str, float]:
         # koşumlar arasi degistigi icin "kac tane" ile "hangi oranda" ayri
         # okunmali; oran zaten config'te ilan edilmis sabittir.
         "immigrants": int(stats.get("immigrants", 0)),
+        # --- FAZ 9: MELEZ ETIKET ---
+        # Uc hucre: saf akraba / melez akraba / yabanci. Ham oranlar bilgi
+        # icindir; KANIT olan, enerji katmanli `_adj` olculeridir ve onlar da
+        # kendi KARISTIRMA kontroluna karsi okunur (Faz 3'ten beri ayni kural).
+        "hybrid_births": int(stats.get("hybrid_births", 0)),
+        "opp_hybrid": int(stats.get("opp_hybrid", 0)),
+        "opph_pk": int(stats.get("opph_pk", 0)),
+        "opph_hyb": int(stats.get("opph_hyb", 0)),
+        "opph_nn": int(stats.get("opph_nn", 0)),
+        "coop_pure_kin": round(_ratio(stats.get("shr_pk", 0), stats.get("opph_pk", 0)), 5),
+        "coop_hybrid_kin": round(_ratio(stats.get("shr_hyb", 0), stats.get("opph_hyb", 0)), 5),
+        "coop_out": round(_ratio(stats.get("shr_nn", 0), stats.get("opph_nn", 0)), 5),
+        "atk_pure_kin": round(_ratio(stats.get("atk_pk", 0), stats.get("opph_pk", 0)), 5),
+        "atk_hybrid_kin": round(_ratio(stats.get("atk_hyb", 0), stats.get("opph_hyb", 0)), 5),
+        "atk_out": round(_ratio(stats.get("atk_nn", 0), stats.get("opph_nn", 0)), 5),
+        # ⚠ REFERANS SAF AKRABA: "melez, saf akrabadan farkli mi gorulyor?"
+        # Yabanciya karsi okumak baska bir sorudur, ayri sutunda.
+        "hyb_share_adj": round(
+            stratified_kin_bias(stats, "shr", group="hyb", ref="pk", opp="opph"), 5),
+        "hyb_atk_adj": round(
+            stratified_kin_bias(stats, "atk", group="hyb", ref="pk", opp="opph"), 5),
+        "hyb_share_vs_out_adj": round(
+            stratified_kin_bias(stats, "shr", group="hyb", ref="nn", opp="opph"), 5),
         # Faz 8: yogunluk cezasinin yaktigi enerji. GIDER oldugu icin isareti
         # daima >= 0; `energy_created` ile karistirilmamali (o korunum sayaci).
         "crowding_drain": round(float(stats.get("crowding_drain", 0.0)), 3),
@@ -562,7 +600,8 @@ def _ratio(num, den) -> float:
 
 
 def stratified_kin_bias(
-    stats: dict, action: str = "shr", buckets: int = 5, group: str = "kin", opp: str = "opp"
+    stats: dict, action: str = "shr", buckets: int = 5, group: str = "kin",
+    opp: str = "opp", ref: str = "non",
 ) -> float:
     """Verici enerjisine gore katmanlanmis akrabalik ayrimciligi.
 
@@ -586,16 +625,22 @@ def stratified_kin_bias(
     group="pos", opp="oppr" ile cagrilir: defteri POZITIF olan partner vs
     digerleri. Konfound ayni: defteri pozitif olan ajan ENERJI ALMISTIR,
     yani zengindir ve zaten daha cok paylasir.
+
+    `ref`: KARSILASTIRMA TABANI. Varsayilan "non" (yabanci). Faz 9'da melez
+    icin ref="pk" (saf akraba) ile cagrilir: "melez akrabaya, SAF akrabaya
+    davranildigindan farkli mi davraniliyor?" Referansi degistirmek sorunun
+    kendisini degistirir, bu yuzden acikca yazilir.
     """
     num = den = 0.0
     for b in range(buckets):
         ok = float(stats.get(f"{opp}_{group}_{b}", 0))
-        on = float(stats.get(f"{opp}_non_{b}", 0))
+        on = float(stats.get(f"{opp}_{ref}_{b}", 0))
         if ok <= 0 or on <= 0:
             continue
         w = ok * on / (ok + on)
         num += w * (
-            stats.get(f"{action}_{group}_{b}", 0) / ok - stats.get(f"{action}_non_{b}", 0) / on
+            stats.get(f"{action}_{group}_{b}", 0) / ok
+            - stats.get(f"{action}_{ref}_{b}", 0) / on
         )
         den += w
     return num / den if den else 0.0

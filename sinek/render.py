@@ -39,7 +39,7 @@ def lineage_colors(agents, top_n: int = len(LINEAGE_PALETTE)) -> dict[int, tuple
     """En kalabalik `top_n` soya palet rengi, digerlerine gri atar."""
     counts: dict[int, int] = {}
     for a in agents:
-        counts[a.genome.surname] = counts.get(a.genome.surname, 0) + 1
+        counts[a.genome.label()] = counts.get(a.genome.label(), 0) + 1
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:top_n]
     return {name: LINEAGE_PALETTE[i] for i, (name, _n) in enumerate(ranked)}
 
@@ -119,7 +119,7 @@ def render(sim) -> np.ndarray:
             # ton = soyisim (kimlik), parlaklik = enerji (durum).
             # Alt sinir yuksek tutuldu: ac bir sinek sonuk olsun ama rengi
             # hala okunabilsin.
-            r, g, b = palette.get(a.genome.surname, OTHER_LINEAGE)
+            r, g, b = palette.get(a.genome.label(), OTHER_LINEAGE)
             k = 0.60 + 0.40 * t
             color = (int(r * k), int(g * k), int(b * k))
         else:

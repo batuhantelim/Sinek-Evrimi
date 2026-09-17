@@ -23,6 +23,7 @@ import hamilton_probe  # noqa: E402
 import env_sweep  # noqa: E402
 import predator_sweep  # noqa: E402
 import diversity_report  # noqa: E402
+import hybrid_report  # noqa: E402
 import partner_report  # noqa: E402
 import seed_sweep  # noqa: E402
 
@@ -360,6 +361,22 @@ class TestBasinMap(unittest.TestCase):
         f8["evolution"]["immigration_rate"] = f7["evolution"]["immigration_rate"]
         self.assertEqual(_mechanics(f8), _mechanics(f7))
 
+    def test_phase9_changes_only_the_hybrid_label(self):
+        """Faz 9'un iddiasi: 'zemin Faz 8'in yogunluk rejimi, yalnizca melez
+        etiket acildi'. Ucuncu bir fark sizarsa melezin etkisi baska bir
+        degisiklige karisir."""
+        f9 = load_config(os.path.join(ROOT, "experiments", "faz9_melez.yaml")).to_dict()
+        f8 = load_config(os.path.join(ROOT, "experiments", "faz8_yogunluk.yaml")).to_dict()
+        self.assertTrue(f9["rules"]["hybrid"]["enabled"])
+        self.assertGreater(f9["rules"]["hybrid"]["rate"], 0.0)
+        self.assertFalse(f8["rules"]["hybrid"]["enabled"])
+        # Faz 8'in kaldiraci Faz 9'da AYNEN acik kalmali: zemin o.
+        self.assertTrue(f9["rules"]["crowding"]["enabled"])
+        self.assertEqual(f9["rules"]["crowding"]["cost"],
+                         f8["rules"]["crowding"]["cost"])
+        f9["rules"]["hybrid"] = f8["rules"]["hybrid"]
+        self.assertEqual(_mechanics(f9), _mechanics(f8))
+
     def test_predator_is_off(self):
         cfg = load_config(
             overrides=seed_sweep.FIXED + seed_sweep.REGIME + [basin_map.PREDATOR_OFF]
@@ -480,3 +497,29 @@ class TestDiversityReport(unittest.TestCase):
     def test_tail_skips_empty_cells(self):
         rows = [{"x": "2"}, {"x": ""}, {"x": "4"}]
         self.assertEqual(list(diversity_report.tail(rows, "x", frac=1.0)), [2.0, 4.0])
+
+
+class TestHybridReport(unittest.TestCase):
+    """Faz 9 esikleri ONCEDEN ilan edildi; kodla dosya ayrisirsa "olcutu sonucu
+    gormeden ilan ettim" iddiasi coker."""
+
+    def test_thresholds_match_the_declared_criteria(self):
+        with open(os.path.join(ROOT, "docs", "faz9", "olcut.md"), encoding="utf-8") as fh:
+            doc = fh.read()
+        self.assertEqual(hybrid_report.HYBRID_SHARE_MIN, 0.05)
+        self.assertEqual(hybrid_report.OPP_HYBRID_MIN, 1000)
+        self.assertEqual(hybrid_report.T_MIN, 2.0)
+        for needle in ("melez pay\u0131 \u2265 %5", "1000", "Welch t > 2"):
+            self.assertIn(needle, doc)
+
+    def test_verdict_names_match_the_doc(self):
+        """Aracin yazdigi karar adlari, olcut dosyasindaki tanimlarla ayni
+        olmali; biri degisip oteki kalirsa rapor baska bir seyi olcer."""
+        with open(os.path.join(ROOT, "docs", "faz9", "olcut.md"), encoding="utf-8") as fh:
+            doc = fh.read()
+        with open(os.path.join(ROOT, "tools", "hybrid_report.py"), encoding="utf-8") as fh:
+            tool = fh.read()
+        for verdict in ("DI\u015eLAMA", "K\u00d6PR\u00dc", "FARK YOK"):
+            self.assertIn(verdict, doc)
+        for verdict in ("DISLAMA", "KOPRU", "FARK YOK"):
+            self.assertIn(f'"{verdict}"', tool)

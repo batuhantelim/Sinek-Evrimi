@@ -1,0 +1,54 @@
+# FAZ 9 — MELEZ SOYİSİM: iki saf soydan doğan çocuk birleşik `{X,Y}` etiketi alır.
+#
+# Zemin Faz 8'in yoğunluğa bağlı seçilim rejimi (`faz8_yogunluk.yaml`) ile
+# BİREBİR aynı — tek fark `rules.hybrid`. O zemin gerekli, çünkü melezin
+# "iki ebeveyn soyu tarafından nasıl karşılandığı" ancak birden çok soy
+# yaşarken ölçülebilir (Faz 8: etkin soy 4.4–15.1, dış-grup payı %11.9–49.8).
+#
+# MELEZLİK SALT ETİKETTİR: üreme aseksüel kalır, genom tek ebeveynden gelir,
+# ikinci ebeveyn hiçbir şey ödemez. Melez bir sınıf/kast DEĞİLDİR; nasıl
+# muamele gördüğü ÖLÇÜLÜR (`hyb_share_adj`, `hyb_atk_adj`), kodlanmaz.
+#
+# Kollar:
+#   melez       (bu dosya)
+#   melez-yok   --set rules.hybrid.enabled=false
+#   karistirma  --set rules.kinship.control=shuffle_surnames
+#
+#   python run.py --config experiments/faz9_melez.yaml --seed 42
+run:
+  name: faz9_melez
+  steps: 12000
+  load_genomes: null      # TAZE — açıkça yazılır
+agents:
+  max_count: 5000
+  motors:
+    max_speed: 0.20
+    max_turn: 0.25
+  reproduction:
+    spawn_radius: 0.3
+evolution:
+  immigration_rate: 0.0
+rules:
+  hybrid:
+    enabled: true
+    rate: 0.10
+    radius: 5.0
+  crowding:
+    enabled: true
+    radius: 5.0
+    cost: 0.30
+    control: none
+  partner:
+    enabled: false
+  memory:
+    enabled: false
+  predator:
+    enabled: false
+  share:
+    need_bonus: 3.0
+    need_mode: fitness
+  attack:
+    enabled: true
+viz:
+  color_by: lineage
+  every: 50

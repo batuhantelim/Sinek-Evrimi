@@ -329,6 +329,32 @@ rules:
     cooldown: 20          # vurus sonrasi bekleme — seyreltmenin motoru
     turn_rate: 0.20       # avci da ani yon degistiremez
 
+  hybrid:
+    # FAZ 9 — MELEZ SOYISIM (SALT ETIKET).
+    #
+    # Ureme ASEKSUEL kalir: genom tek ebeveynden gelir. Melezlik yalnizca
+    # soyagaci etiketini iki bilesenli yapar: ebeveynin menzilinde FARKLI
+    # soydan biri varsa, `rate` olasilikla cocugun etiketi `{X, Y}` olur.
+    #
+    # Kararlar (docs/faz9/olcut.md, kosumlardan ONCE yazildi):
+    #   * yalnizca iki SAF soy melezlesir — ebeveyn zaten melezse cocuk
+    #     etiketi aynen miras alir ("melez saf doller"). Boylece etiket en
+    #     fazla iki bilesen tasir ve "hangi iki soy birlesti" yorumlanabilir.
+    #   * AKRABALIK = en az bir ortak bilesen (`sinek/lineage.py`). Saf X ile
+    #     {X,Y} akrabadir; {X,Y} ile saf Z yabancidir.
+    #   * ENERJI DEFTERINE DOKUNMAZ: ikinci ebeveyn hicbir sey odemez, hicbir
+    #     sey almaz, genomu cocuga gecmez.
+    #
+    # ⚠ Melezin nasil MUAMELE GORECEGI hicbir yerde yazmaz. Melez bir sinif
+    # ya da kast DEGILDIR; yalnizca iki bilesenli bir etikettir. Dislaniyor mu,
+    # kopru mu oluyor — bu OLCULUR (`hyb_share_adj`, `hyb_atk_adj`).
+    #
+    # rate = 0.0'da hicbir rastgele cekim yapilmaz: Faz 1-8 hash'leri birebir
+    # korunur.
+    enabled: false
+    rate: 0.0
+    radius: 5.0
+
   crowding:
     # FAZ 8 — YOGUNLUGA BAGLI SECILIM (negatif frekans bagimliligi).
     #

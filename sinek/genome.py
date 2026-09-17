@@ -18,6 +18,12 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .brains import genome_size_for
+from .lineage import kin_labels, label_key
+
+
+def kin_of(g1: "Genome", g2: "Genome") -> bool:
+    """Iki genomun etiketleri akraba mi (bkz. `lineage.kin_labels`)."""
+    return kin_labels(g1.surname, g1.surname2, g2.surname, g2.surname2)
 
 
 @dataclass
@@ -30,10 +36,29 @@ class Genome:
     surname: int = 0   # Faz 3: soyisim. Kurucuya benzersiz atanir, yavru miras alir.
     #  DIKKAT: ayni soyisim != genetik olarak ozdes. Etiket soyagacini izler,
     #  guncel benzerligi degil; mutasyon zamanla ayni soyadi tasiyanlari ayirir.
+    surname2: int = -1  # Faz 9: MELEZ etiketin ikinci bileseni (-1 = saf soy).
+    #  Melezlik SALT ETIKETTIR: ureme aseksuel kalir, genom tek ebeveynden gelir.
+    #  Bu alan yalnizca soyagaci etiketini iki bilesenli yapar; genom benzerligi
+    #  icin `genetic_r` ayri olculur (Faz 4.6/7 dersi: soyisim != benzerlik).
 
     # --- kopya / ureme -------------------------------------------------
     def copy(self) -> "Genome":
-        return Genome(dict(self.params), self.weights.copy(), self.lineage, self.surname)
+        return Genome(dict(self.params), self.weights.copy(), self.lineage,
+                      self.surname, self.surname2)
+
+    def label(self) -> tuple[int, ...]:
+        """Soy etiketi: saf soyda `(X,)`, melezde sirali `(X, Y)`.
+
+        Soy istatistikleri ve gorsellestirme BUNU anahtar olarak kullanir, yani
+        bir melez KENDI grubudur. Bu, `lineage_effective`'i tanim geregi
+        yukseltebilir — bu yuzden Faz 9 olcutleri MELEZ-YOK koluna karsi okunur,
+        sifira karsi degil (bkz. docs/faz9/olcut.md).
+        """
+        return label_key(self.surname, self.surname2)
+
+    @property
+    def is_hybrid(self) -> bool:
+        return self.surname2 >= 0
 
     def child(self, cfg, rng: np.random.Generator) -> "Genome":
         """Ureme sirasinda cagrilir. Mutasyon kapaliysa saf klon dondurur."""

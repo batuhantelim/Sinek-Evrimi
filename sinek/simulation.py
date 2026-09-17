@@ -34,7 +34,7 @@ import numpy as np
 
 from .agent import M, Agent
 from .brains import make_brain
-from .genome import Genome, founder_genome
+from .genome import Genome, founder_genome, kin_of
 from .physics import Physics
 from .predator import PredatorPack
 from .metrics import (
@@ -114,6 +114,13 @@ class Simulation:
         # Yerel olarak KALABALIKLASAN soy adim basina ek enerji oder. Hicbir soy
         # adiyla hedeflenmez; ceza yalnizca YEREL FREKANSA bakar. Bir GIDERdir,
         # kaynak degil (paylasimin korunumuna dokunmaz).
+        # --- Faz 9: MELEZ soyisim (SALT ETIKET) ---
+        # Ureme aseksuel kalir; genom tek ebeveynden gelir. Melezlik yalnizca
+        # soyagaci etiketini iki bilesenli yapar ve enerji defterine DOKUNMAZ
+        # (ikinci ebeveyn hicbir sey odemez, hicbir sey almaz).
+        self.hybrid_on = bool(cfg.get("rules.hybrid.enabled", False))
+        self.hybrid_rate = float(cfg.get("rules.hybrid.rate", 0.0))
+        self.hybrid_radius = float(cfg.get("rules.hybrid.radius", 5.0))
         self.crowding_on = bool(cfg.get("rules.crowding.enabled", False))
         self.crowding_radius = float(cfg.get("rules.crowding.radius", 5.0))
         self.crowding_cost = float(cfg.get("rules.crowding.cost", 0.0))
@@ -155,11 +162,12 @@ class Simulation:
         self._next_surname = len(self.agents)
         for i, a in enumerate(self.agents):
             a.genome.surname = i
+            a.genome.surname2 = -1
             # Faz 8: kalabalik cezasinin etiketi soyisimle birlikte yenilenmeli.
             # `_spawn` onu genomdan okuyor ama kurucular BURADA yeniden
             # adlandiriliyor; atlanirsa butun kurucular ayni etiketi tasir ve
             # ceza "herkes ayni soydan" diye hesaplanir (test yakaladi).
-            a.crowd_label = i
+            a.crowd_label = (i,)
 
         self.predators = PredatorPack(cfg, self.world, self.rng)
 
@@ -204,7 +212,9 @@ class Simulation:
             birth_step=self.step_index,
         )
         agent.mem_id = agent.id          # Faz 5: tanima kimligi (kontrol permute eder)
-        agent.crowd_label = genome.surname   # Faz 8: kalabalik cezasinin baktigi etiket
+        # Faz 8/9: kalabalik cezasinin etiketi. Melez KENDI sinifidir — ceza
+        # "ayni etiketten kac komsu" sayar, melez de bir etikettir.
+        agent.crowd_label = genome.label()
         self._next_id += 1
         return agent
 
@@ -227,7 +237,7 @@ class Simulation:
             for a in self.agents:
                 a.predator_signal = self.predators.signal(a.x, a.y)
 
-        if self._social_enabled or self.crowding_on:
+        if self._social_enabled or self.crowding_on or self._hybrid_active:
             # Faz 3: akrabalik sensoru ve paylasim ayni "en yakin komsu"yu
             # kullanir; bir kez hesaplanip onbellege alinir. Faz 8'in kalabalik
             # cezasi da ayni izgarayi kullanir, sosyal kurallar kapaliyken bile.
@@ -413,6 +423,22 @@ class Simulation:
                 # ve genetik etkisi ayni kalir.
                 genome.surname = self._next_surname
                 self._next_surname += 1
+            elif self._hybrid_active and not a.genome.is_hybrid:
+                # FAZ 9 — MELEZ: ebeveynin menzilinde FARKLI soydan biri varsa
+                # cocuk birlesik `{X, Y}` etiketi alir. Yalnizca iki SAF soy
+                # melezlesir (ebeveyn zaten melezse cocuk etiketi aynen miras
+                # alir) — boylece etiket en fazla iki bilesen tasir ve "hangi
+                # iki soy birlesti" yorumlanabilir kalir.
+                #
+                # Melezin nasil MUAMELE GORECEGI hicbir yerde yazmaz; bu satir
+                # yalnizca ETIKET uretir. Enerji defterine dokunulmaz.
+                mate = self._hybrid_mate(a)
+                if mate is not None and self.rng.random() < self.hybrid_rate:
+                    genome.surname2 = mate.genome.surname
+                    self.stats_step["hybrid_births"] += 1
+                elif self.split_rate > 0.0 and self.rng.random() < self.split_rate:
+                    genome.surname = self._next_surname
+                    self._next_surname += 1
             elif self.split_rate > 0.0 and self.rng.random() < self.split_rate:
                 # Soy bolunmesi: nadiren yeni bir soyisim dogar.
                 # Soylar suruklenmeyle tukendigi icin (kurucu sayisi sadece
@@ -593,7 +619,7 @@ class Simulation:
             if dx * dx + dy * dy > radius2:
                 continue  # hareket ettiler, artik menzilde degil
 
-            kin = other.genome.surname == a.genome.surname
+            kin = kin_of(other.genome, a.genome)
             stats["opp_kin" if kin else "opp_nonkin"] += 1
             # Enerji katmani: akrabalar uzamsal kumelendigi icin "en yakini
             # akraba" olmak, zengin bir yamada olmakla — yani paylasacak
@@ -601,6 +627,15 @@ class Simulation:
             # bu konfoundu notrler (bkz. metrics.social_rates).
             bucket = min(ENERGY_BUCKETS - 1, int(a.energy / e_max * ENERGY_BUCKETS))
             stats[f"{'opp_kin' if kin else 'opp_non'}_{bucket}"] += 1
+
+            # FAZ 9: ayni firsat UC hucreye ayrilir — saf akraba / melez akraba
+            # / yabanci. Melezin nasil muamele gordugu boyle olculur; hicbir
+            # yerde "melez sunu alsin" diye bir kural yoktur.
+            other_hyb = other.genome.is_hybrid   # OLCUM ICIN; karar dali DEGIL
+            hcell = ("hyb" if other_hyb else "pk") if kin else "nn"
+            stats[f"opph_{hcell}"] += 1
+            stats[f"opph_{hcell}_{bucket}"] += 1
+            stats["opp_hybrid"] += other_hyb
 
             # Faz 5: ayni firsat, DEFTERE gore de siniflanir. "Bu birey bana
             # daha once verdi mi?" Ayni enerji konfoundu burada da var —
@@ -621,7 +656,7 @@ class Simulation:
             if atk_margin > share_margin and atk_margin >= 0.0:
                 self._do_attack(
                     a, other, kin, bucket, atk_urge, atk_damage, atk_steal, atk_cost,
-                    atk_floor, grudge
+                    atk_floor, grudge, hcell
                 )
                 continue
             if share_margin < 0.0:
@@ -697,12 +732,14 @@ class Simulation:
                 stats["share_rescue"] += 1
             stats["share_kin" if kin else "share_nonkin"] += 1
             stats[f"{'shr_kin' if kin else 'shr_non'}_{bucket}"] += 1
+            stats[f"shr_{hcell}_{bucket}"] += 1
+            stats[f"shr_{hcell}"] += 1
             # Faz 5 karsiliklilik sayaci
             stats[f"{'rcp_pos' if owes else 'rcp_non'}_{bucket}"] += 1
             self.share_events.append((a.x, a.y, other.x, other.y, kin))
 
     def _do_attack(self, a, other, kin, bucket, urge, damage, steal, cost, floor,
-                   grudge: bool = False) -> None:
+                   grudge: bool = False, hcell: str = "nn") -> None:
         """Saldiri: hedeften enerji alir, hedefe zarar verir, saldirgana MALIYET.
 
         SALDIRI DA ODULLENDIRILMEZ. `evolution.fitness` icinde saldiri terimi
@@ -733,12 +770,30 @@ class Simulation:
         stats["attack_damage"] += inflicted
         stats["attack_kin" if kin else "attack_nonkin"] += 1
         stats[f"{'atk_kin' if kin else 'atk_non'}_{bucket}"] += 1
+        stats[f"atk_{hcell}_{bucket}"] += 1
+        stats[f"atk_{hcell}"] += 1
         # Faz 5: MISILLEME sayaci — "bana saldirana saldirdim mi?"
         stats[f"{'rtl_neg' if grudge else 'rtl_non'}_{bucket}"] += 1
         if other.energy <= 0.0:
             other.death_cause = "killed"
             stats["attack_kills"] += 1
         self.attack_events.append((a.x, a.y, other.x, other.y, kin))
+
+    @property
+    def _hybrid_active(self) -> bool:
+        return self.hybrid_on and self.hybrid_rate > 0.0
+
+    def _hybrid_mate(self, a: Agent):
+        """Menzildeki en yakin FARKLI soydan birey (yoksa None).
+
+        Ikinci ebeveyn yalnizca ETIKET verir: hicbir enerji odemez, hicbir sey
+        almaz, genomu cocuga gecmez. Deterministik — `hash.nearest` gibi
+        mesafeye ve id'ye gore secer.
+        """
+        for other, _d2 in self.hash.candidates(a, self.hybrid_radius, self.world, 4):
+            if not other.genome.is_hybrid and other.genome.surname != a.genome.surname:
+                return other
+        return None
 
     def _apply_crowding_cost(self) -> None:
         """Negatif frekans bagimliligi: yerel olarak kalabalik olan soy oder.
@@ -788,10 +843,10 @@ class Simulation:
         """
         if len(self.agents) < 2:
             return
-        names = [a.genome.surname for a in self.agents]
+        names = [(a.genome.surname, a.genome.surname2) for a in self.agents]
         order = self.rng.permutation(len(names))
         for a, idx in zip(self.agents, order):
-            a.genome.surname = names[int(idx)]
+            a.genome.surname, a.genome.surname2 = names[int(idx)]
 
     def _choose_partner(self, a: Agent):
         """Faz 6: aday havuzundan hedefi SECER.
@@ -827,7 +882,7 @@ class Simulation:
         e_max = self.physics.energy_max
         best_i, best_score = 0, None
         for i, (other, d2) in enumerate(pool):
-            kin = 1.0 if other.genome.surname == a.genome.surname else -1.0
+            kin = 1.0 if kin_of(other.genome, a.genome) else -1.0
             led = 0.0
             if self.memory_on:
                 bal = a.ledger.get(other.mem_id)
@@ -862,17 +917,17 @@ class Simulation:
             stats["pick_not_nearest"] += 1
         chosen = pool[idx][0]
         near = pool[0][0]          # politika olmasaydi secilecek olan
-        if chosen.genome.surname == a.genome.surname:
+        if kin_of(chosen.genome, a.genome):
             stats["pick_kin"] += 1
         # ⚠ ASIL REFERANS EN YAKIN, havuz ortalamasi DEGIL. Akrabalar uzamsal
         # kumelendigi icin en yakin zaten havuz ortalamasindan daha sik
         # akrabadir; havuza karsi okunan secicilik, politika hic yokken bile
         # +0.05 cikiyor (olculdu). Politikanin KENDI katkisi ancak "secilen vs
         # en yakin" farkiyla izole edilir.
-        if near.genome.surname == a.genome.surname:
+        if kin_of(near.genome, a.genome):
             stats["near_kin"] += 1
         stats["pool_kin"] += sum(
-            1 for o, _ in pool if o.genome.surname == a.genome.surname
+            1 for o, _ in pool if kin_of(o.genome, a.genome)
         )
         if self.memory_on:
             if a.ledger.get(chosen.mem_id, 0.0) > 0.0:
@@ -996,6 +1051,14 @@ def _empty_stats() -> dict:
         "births": 0,
         "immigrants": 0,        # Faz 7: taze kurucu genomla dogan yavru sayisi
         "crowding_drain": 0.0,  # Faz 8: yogunluk cezasinin yaktigi enerji (GIDER)
+        "hybrid_births": 0,     # Faz 9: birlesik etiketle dogan yavru sayisi
+        "opp_hybrid": 0,        # Faz 9: en yakini MELEZ olan firsat (ornek buyuklugu)
+        **{f"opph_{c}": 0 for c in ("pk", "hyb", "nn")},
+        **{f"shr_{c}": 0 for c in ("pk", "hyb", "nn")},
+        **{f"atk_{c}": 0 for c in ("pk", "hyb", "nn")},
+        **{f"opph_{c}_{b}": 0 for c in ("pk", "hyb", "nn") for b in range(ENERGY_BUCKETS)},
+        **{f"shr_{c}_{b}": 0 for c in ("pk", "hyb", "nn") for b in range(ENERGY_BUCKETS)},
+        **{f"atk_{c}_{b}": 0 for c in ("pk", "hyb", "nn") for b in range(ENERGY_BUCKETS)},
         "deaths": 0,
         "repro_blocked": 0,   # tavan yuzunden yanan ureme hakki (Faz 4.5)
         "death_starved": 0,

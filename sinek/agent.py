@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from .lineage import kin_labels
+
 # --- Sozlesme: sensor vektoru ------------------------------------------
 SENSOR_NAMES: list[str] = [
     "bias",             # 0  sabit 1.0
@@ -168,7 +170,8 @@ class Agent:
         # kosullandirabilir ama zorunda degil; "akrabaya paylas" davranisi
         # evrimlesirse evrimlesir.
         if self.nearest is not None:
-            s[S["kin"]] = 1.0 if self.nearest.genome.surname == self.genome.surname else -1.0
+            s[S["kin"]] = 1.0 if kin_labels(self.nearest.genome.surname, self.nearest.genome.surname2,
+                                    self.genome.surname, self.genome.surname2) else -1.0
             s[S["near_agent"]] = 1.0
             s[S["neighbor_need"]] = min(
                 1.0, max(0.0, 1.0 - self.nearest.energy / phys.energy_max)
