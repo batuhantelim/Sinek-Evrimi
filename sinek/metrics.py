@@ -14,6 +14,8 @@ import os
 
 import numpy as np
 
+from .lineage import label_key
+
 BASE_COLUMNS = [
     "step",
     "generation",
@@ -369,7 +371,10 @@ def lineage_stats(agents) -> dict[str, float]:
         return {"lineage_count": 0, "lineage_effective": 0.0, "lineage_largest": 0.0}
     counts: dict[int, int] = {}
     for a in agents:
-        key = a.genome.label()   # Faz 9: melez KENDI grubudur
+        # Faz 9: melez KENDI grubudur. `label_key` alanlardan hesaplanir —
+        # metoda baglanmaz, cunku testlerdeki genom taklitleri de bu yoldan
+        # gecer ve olcum kodu taklide bagimli olmamali.
+        key = label_key(a.genome.surname, getattr(a.genome, "surname2", -1))
         counts[key] = counts.get(key, 0) + 1
     p = np.array(list(counts.values()), dtype=np.float64) / n
     entropy = float(-(p * np.log(p)).sum())
@@ -384,7 +389,8 @@ def lineage_stats(agents) -> dict[str, float]:
         # uretmek `lineage_effective`'i tanim geregi yukseltebilir — olcutler
         # bu yuzden MELEZ-YOK koluna karsi okunur (docs/faz9/olcut.md).
         "hybrid_share": round(
-            sum(1 for a in agents if a.genome.is_hybrid) / n, 5),
+            sum(1 for a in agents
+                if getattr(a.genome, "surname2", -1) >= 0) / n, 5),
     }
 
 

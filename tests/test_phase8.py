@@ -122,7 +122,9 @@ class TestShuffledControl(unittest.TestCase):
         sim._shuffle_crowd_labels()
         self.assertEqual([a.genome.surname for a in sim.agents], soyisimler,
                          "kontrol soyisimleri bozdu — olcum okunamaz hale gelir")
-        self.assertEqual(sorted(a.crowd_label for a in sim.agents), sorted(soyisimler),
+        # Faz 9'dan beri `crowd_label` bir ETIKET DEMETI (melez iki bilesenli).
+        self.assertEqual(sorted(a.crowd_label for a in sim.agents),
+                         sorted((x,) for x in soyisimler),
                          "etiket cokluk dagilimi korunmali (ornek degil bilgi silinir)")
 
     def test_control_still_pays_the_same_kind_of_cost(self):

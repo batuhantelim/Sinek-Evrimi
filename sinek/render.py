@@ -10,6 +10,8 @@ import math
 
 import numpy as np
 
+from .lineage import label_key
+
 from .font3x5 import GLYPH_H, draw_text
 
 BG = np.array([12, 14, 20], dtype=np.uint8)
@@ -39,7 +41,8 @@ def lineage_colors(agents, top_n: int = len(LINEAGE_PALETTE)) -> dict[int, tuple
     """En kalabalik `top_n` soya palet rengi, digerlerine gri atar."""
     counts: dict[int, int] = {}
     for a in agents:
-        counts[a.genome.label()] = counts.get(a.genome.label(), 0) + 1
+        key = label_key(a.genome.surname, getattr(a.genome, "surname2", -1))
+        counts[key] = counts.get(key, 0) + 1
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:top_n]
     return {name: LINEAGE_PALETTE[i] for i, (name, _n) in enumerate(ranked)}
 
@@ -119,7 +122,9 @@ def render(sim) -> np.ndarray:
             # ton = soyisim (kimlik), parlaklik = enerji (durum).
             # Alt sinir yuksek tutuldu: ac bir sinek sonuk olsun ama rengi
             # hala okunabilsin.
-            r, g, b = palette.get(a.genome.label(), OTHER_LINEAGE)
+            r, g, b = palette.get(
+                label_key(a.genome.surname, getattr(a.genome, "surname2", -1)),
+                OTHER_LINEAGE)
             k = 0.60 + 0.40 * t
             color = (int(r * k), int(g * k), int(b * k))
         else:

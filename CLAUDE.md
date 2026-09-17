@@ -48,6 +48,8 @@ davranış oradan **türer**.
 | **Faz 6** | Partner seçimi: dışlama evrimleşti, işbirliği tabandan çıkmadı | ✅ **tamam** |
 | **Faz 7** | Çeşitlilik denetimi: taze başlangıç ÇÖZMÜYOR; Faz 5 geçerli zeminde tekrarlandı | ✅ **tamam** |
 | **Faz 8** | Yoğunluğa bağlı seçilim süpürgeyi durdurdu (4/5); ölçülebilir zemin kuruldu | ✅ **tamam** |
+| **Faz 9 — bileşen 1** | Melez soyisim: ayrımcılık yok (3/3), ama mekanik ölçüm zeminini yiyor | ✅ **tamam** |
+| **Faz 9 — bileşen 2–3** | Soy-arası matris + işbirliği kontrolü — zemin onarılmadan başlamaz | ⏸ |
 | **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
 `config.yaml` **her zaman en güncel fazın** varsayılanını taşır. Şu an:
@@ -79,6 +81,7 @@ sinek/
   genome.py             Genom (params + weights + soyisim) + gaussian mutasyon
   physics.py            Sıcak yol için dondurulmuş fizik sabitleri
   spatial.py            Uzamsal hash (Faz 3 ikili etkileşimleri için)
+  lineage.py            Faz 9: soy etiketi cebiri (akrabalık = ortak bileşen)
   predator.py           Faz 4: ortak, dışsal, GRUP-KÖR avcı sürüsü
   persistence.py        Popülasyonu npz olarak kaydet/yükle
   simulation.py         Adım döngüsü + nesil döngüsü + seçilim
@@ -103,6 +106,7 @@ tools/encounter_probe.py  Tekrarlı karşılaşma: EPİZOT mu, uzun bitişiklik 
 tools/partner_report.py   Faz 6 üç kol: önkoşul + asıl ölçüt + politika ölçütü ayrı
 tools/exclusion_probe.py  Dışlama: YAPISAL mı BİREYSEL mi; seçilmeyenlerin profili
 tools/diversity_report.py Faz 7/8: çeşitlilik ölçütü + çeşitliliğin bedeli (`--faz8-taban`)
+tools/hybrid_report.py    Faz 9: melez dışlanıyor mu / köprü mü (üç hücre, kontrole karşı)
 tests/                  unittest — determinizm + faz testleri + araç/yöntem testleri
 ```
 
@@ -938,6 +942,65 @@ Geniş dünya ve uzamsal sığınaklar (coğrafi ayrışma) bu fazda **hiç koş
 
 ---
 
+## 3.14 Faz 9 bileşen 1: melez soyisim
+
+Tam rapor: **[docs/faz9/melez.md](docs/faz9/melez.md)**
+Ölçüt (koşumlardan önce yazıldı): **[docs/faz9/olcut.md](docs/faz9/olcut.md)**
+
+### Mekanik: SALT ETİKET
+
+Üreme **aseksüel kalır**; genom tek ebeveynden gelir. Ebeveynin menzilinde
+farklı soydan biri varsa `rules.hybrid.rate` olasılıkla çocuk birleşik `{X,Y}`
+etiketi alır. **Yalnızca iki SAF soy melezleşir** (melez saf döller) — etiket
+en fazla iki bileşen taşır.
+
+**Akrabalık artık "en az bir ortak bileşen"** (`sinek/lineage.py`). Tek
+bileşenli etiketlerde tam eşitliğe indirgenir, yani Faz 3–8 birebir korunur.
+Ayrı bir modül, çünkü `genome → brains → agent` zinciri daireseldi.
+
+**Enerji defterine dokunmaz**: ikinci ebeveyn hiçbir şey ödemez/almaz; test
+üreme öncesi/sonrası enerji farkının iki kolda birebir aynı olduğunu sabitler.
+`rate = 0.0`'da hiçbir rastgele çekim yok → Faz 1–8 hash'leri korunur.
+
+**Melez bir SINIF değildir.** `test_hybrid_is_not_a_hardcoded_class` sosyal
+döngüde melezliğin tek bir **ölçüm** değişkenine okunduğunu ve hiçbir karar
+dalına girmediğini denetler — testin ilk sürümü kodu yakaladı.
+
+### Sonuç: ayrımcılık YOK (3/3), ama mekanik zemini YİYOR
+
+| soru | sonuç |
+|---|---|
+| melez oluşuyor mu, örneklem yeterli mi | ✅ 3/3 (melez payı %53–74, `opp_hybrid` 40k–55k) |
+| **dışlanıyor mu / köprü mü** | **FARK YOK 3/3** (DIŞLAMA 0/3, KÖPRÜ 0/3) |
+| zemin bozulmadı mı (ölçüt 2) | ❌ **1/3** — dış-grup payı %49.7→31.0, %11.9→**1.8**, %16.2→**6.6** |
+| `genetic_r` çökmedi mi (ölçüt 3) | ✅ 3/3 (0.59×–1.29×) |
+| enerji korunumu | ✅ 9/9 koşum |
+
+### ⚠⚠ Melez payı bir MANDAL: oranla kontrol edilemiyor
+
+Doğumların **binde beşi** melez olduğunda bile melez payı %53'e çıkıyor
+(%0 → %53–78, tek yönlü). Sebep koşumdan önce yazdığımız kuralın kendisi:
+*melez saf döller* — bir melez hattı geri dönmüyor, saf soylar üretmeye devam
+ediyor. `rate` yalnızca **ne kadar hızlı** doyduğunu belirliyor.
+
+Ve akrabalık "en az bir ortak bileşen" olduğu için, popülasyonun yarısı
+melezken **neredeyse herkes herkese akraba** oluyor: "yabancı" kategorisi
+eriyor. `lineage_effective` **artıyor** görünürken (10.24 → 21.60) dış-grup
+payı **düşüyor** — iki sayı zıt yönde hareket ediyor.
+
+**Etiket bolluğu ölçülebilirlik demek değildir.**
+
+### Karar: bileşen 2–3 bu zemine KURULMAZ
+
+Soy-arası ilişki matrisi ve Faz 8'in işbirliği gözleminin kontrollü sınaması,
+2/3 seed'de ölçülemez bir zeminde okunurdu — Faz 5/6'nın hatası. Önce melez
+doyumu çözülmeli. Denenmemiş üç seçenek: (1) melez saf döllemesin (etiket bir
+nesil sonra kaybolsun), (2) akrabalığı **sürekli** yap (örtüşme oranı 0/½/1 —
+CLAUDE.md §7'de zaten öngörülmüştü), (3) melezleşme menzilini daralt (⚠ Faz 4.6:
+hareketi kısmak koloniyi çökertiyor).
+
+---
+
 ## 4. Nasıl çalıştırılır
 
 ```bash
@@ -948,7 +1011,7 @@ python run.py --steps 2000 --viz none    # sadece metrik, en hızlısı
 python run.py --viz pygame               # canlı pencere (SPACE: duraklat, Q: çık)
 python run.py --seed 7 --name deney7
 python run.py --check-determinism
-python -m unittest discover -s tests     # 179 test
+python -m unittest discover -s tests     # 199 test
 ```
 
 Hazır deneyler (`experiments/README.md`):
@@ -1045,6 +1108,21 @@ done
 # Dort parcali olcut, TABAN koluna karsi:
 python tools/diversity_report.py --faz8-taban runs/f8_taban_s42 \
   runs/f8_taban_s42 runs/f8_kaldirac_s42 runs/f8_karistirma_s42
+```
+
+Faz 9 (melez soyisim; üç kol, tohum GEREKMEZ — Faz 8 zemini üstünde):
+
+```bash
+for k in melez melezyok karistirma; do
+  case $k in
+    melez)      A="" ;;
+    melezyok)   A="--set rules.hybrid.enabled=false" ;;
+    karistirma) A="--set rules.kinship.control=shuffle_surnames" ;;
+  esac
+  python run.py --config experiments/faz9_melez.yaml --seed 42 --viz none $A \
+    --name f9_${k}_s42
+done
+python tools/hybrid_report.py --seeds 42 7 123
 ```
 
 Faz 4'ün 2×2'si (dört kol da Faz 2 tohumuyla, her biri kendi kontrolüyle):
@@ -1145,6 +1223,11 @@ python run.py --set world.food.regrowth_rate=0.003 --name kitlik
 | `opp_ledger_pos/neg`, `ledger_pos_share` | defter örneklem büyüklükleri (küçükse oran gürültüdür) |
 | `immigrants` | Faz 7: taze kurucu genomla doğan yavru sayısı (etiket değil GENOM çeşitliliği) |
 | `crowding_drain` | Faz 8: yoğunluk cezasının yaktığı enerji — bir **GİDER**, `energy_created` ile karıştırmayın |
+| `hybrid_share`, `hybrid_births`, `opp_hybrid` | Faz 9: melez payı, melez doğum, melezli fırsat (ÖRNEKLEM) |
+| `coop_pure_kin / _hybrid_kin / _out` | üç hücre: saf akraba / melez akraba / yabancı — P(paylaş) |
+| `atk_pure_kin / _hybrid_kin / _out` | aynı üç hücre, P(saldır) |
+| `hyb_share_adj`, `hyb_atk_adj` | melez akrabaya davranış − **SAF akrabaya** (katmanlı) |
+| `hyb_share_vs_out_adj` | melez akrabaya paylaşım − **yabancıya** (katmanlı) |
 | `pool_size` | ortalama aday havuzu (Faz 6) — 1'e yakınsa **seçim diye bir şey yoktur** |
 | `pool_multi` | kararların kaçı ≥2 adaylıydı — seçimin ÖNKOŞULU (ortalama tek başına yetmez) |
 | `pick_not_nearest` | seçim en yakını atladı mı (yetenek gerçekten kullanılıyor mu) |
@@ -1544,6 +1627,29 @@ Tam tablo: **[docs/faz8/yogunluk.md](docs/faz8/yogunluk.md)**
   — ama saldırı da 4/5 seed'de yükseliyor ve eşleşmiş sosyal kontrol yok.
 - **Diğer iki kaldıraç (geniş dünya, uzamsal sığınaklar) hiç koşulmadı.**
 
+### Faz 9 bileşen 1 — melez soyisim (6 oran kalibrasyonu + 3 seed × 3 kol)
+
+Tam tablo: **[docs/faz9/melez.md](docs/faz9/melez.md)**
+
+- **Melez ayrımcılığa uğramıyor: FARK YOK 3/3.** DIŞLAMA 0/3, KÖPRÜ 0/3.
+  Gözlem (ölçüt değil): melez akrabaya hem paylaşım hem saldırı saf akrabadan
+  düşük — ayrımcılık değil, daha az **etkileşim hedefi** olma.
+- **⚠⚠ Mekanik kendi ölçüm zeminini yiyor.** Melez payı doyuma kadar tırmanıyor
+  (%0 → %53–78) ve dış-grup fırsat payı çöküyor (%49.7→31.0, %11.9→**1.8**,
+  %16.2→**6.6**). Zemin ölçütü **1/3 seed**.
+- **Oranla kontrol edilemiyor**: doğumların binde beşi melez olsa bile pay %53.
+  "Melez saf döller" kuralı bir **mandal** üretiyor; `rate` yalnızca hızı
+  belirliyor. Bu kural koşumdan önce ilan edilmişti — sonuç, kuralın kendi
+  mantıksal sonucu.
+- **`lineage_effective` ile dış-grup payı ZIT yönde**: 10.24 → 21.60 artarken
+  dış-grup %49.7 → %31.0 düşüyor. Etiket bolluğu ölçülebilirlik değildir.
+- `genetic_r` çökmedi (3/3, 0.59×–1.29×); enerji korunumu 9/9 koşumda tam;
+  koloni sağlığı korundu (N ±%7, kişi başı toplama ≈ sabit).
+- ⚠ Karıştırma kontrolünde melez payı düşük (%6.7–8.7): kontrol bilgiyi
+  silerken melez **üretim hızını** da değiştiriyor — kontrolün bilinen sınırı.
+- **Bileşen 2 (soy-arası matris) ve 3 (işbirliği kontrolü) HİÇ KOŞULMADI**:
+  zemin onarılmadan başlanmaz.
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -1626,15 +1732,21 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
    okunmalı: kaldıraç ekolojiyi de oynatıyor (N −%0–23, kişi başı toplama
    +%17–35, saldırı 4/5 seed'de yukarı).
    Denenmemiş: geniş dünya ve uzamsal sığınaklar (Faz 8'in diğer iki kaldıracı).
-9. **Melez soyisim**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
+9. ⏸ **Melez soyisim eklendi ama zemini yiyor (§3.14).** Ayrımcılık yok
+   (FARK YOK 3/3), fakat melez payı bir MANDAL gibi doyuma tırmanıyor
+   (%0 → %53–78, doğumların binde beşinde bile) ve "yabancı" kategorisi eriyor
+   (dış-grup payı 2/3 seed'de %10'un altına). **Soy-arası matris ve işbirliği
+   kontrolü bu zemine kurulmaz** — Faz 5/6'nın hatası olurdu. Önce doyum
+   çözülmeli; denenmemiş üç seçenek §3.14'te.
+10. **Melez soyismin ESKİ notu (kısmen aşıldı)**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
    etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
    etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
    değiştirmek bu kodu bozmaz — kısmi akrabalık isteniyorsa
    `agent.sense`'teki `kin` hesabı sürekli bir orana çevrilir.
-10. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
+11. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
    `(soy_i, soy_j)` matrisine genişletilecek. `stratified_kin_bias`
    `action` parametresiyle zaten genel; hücre başına da uygulanabilir.
-11. Adım 2 tohumu: ⚠ **artık tohum gerekmiyor** — `experiments/faz8_yogunluk.yaml`
+12. Adım 2 tohumu: ⚠ **artık tohum gerekmiyor** — `experiments/faz8_yogunluk.yaml`
    taze başlangıçta ölçülebilir çeşitlilik veriyor (§3.13). Tohumlu alternatifler:
    `docs/faz8/population_cok_soylu.npz` (çok soylu),
    `docs/faz4tani/population_taban.npz` (§3.12); diğerleri:
@@ -1818,4 +1930,13 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
   `weight_diversity`'nin düşmediğini **ve** `genetic_r`'nin çökmediğini ayrıca
   göstermek gerekti. Ölçtüğünüz şeyi doğrudan ödüllendiren bir mekanizmada
   döngüsellik şartını ölçüt dosyasına önceden yazın.
+- **ETİKET BOLLUĞU ÖLÇÜLEBİLİRLİK DEĞİLDİR.** Faz 9'da melez etiket
+  `lineage_effective`'i 10.24 → 21.60 çıkardı ama dış-grup fırsat payını
+  %49.7 → %31.0 (ve iki seed'de %10'un altına) düşürdü — iki sayı **zıt yönde**
+  hareket etti. "Kaç farklı etiket var" ile "yabancı bulabiliyor muyum" ayrı
+  sorulardır; sosyal ölçümün ihtiyacı ikincisidir.
+- **GERİ DÖNÜŞSÜZ BİR ETİKET KURALI MANDALDIR.** "Melez saf döller" kuralı,
+  doğumların binde beşi melez olsa bile payı %53'e çıkardı: oran yalnızca
+  **hızı** belirliyor, doyumu değil. Yeni bir etiket kuralı yazarken "geri
+  dönüşü var mı" diye sorun; yoksa kaçınılmaz olarak doyar.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.

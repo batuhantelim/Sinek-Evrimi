@@ -78,6 +78,8 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 6 | Partner seçimi: dışlama evrimleşti, işbirliği tabandan çıkmadı | ✅ |
 | 7 | Çeşitlilik denetimi: taze başlangıç çözmüyor; Faz 5 geçerli zeminde tekrarlandı | ✅ |
 | 8 | Yoğunluğa bağlı seçilim süpürgeyi durdurdu (4/5); ölçülebilir zemin kuruldu | ✅ |
+| 9 — bileşen 1 | Melez soyisim: ayrımcılık yok (3/3), ama mekanik ölçüm zeminini yiyor | ✅ |
+| 9 — bileşen 2–3 | Soy-arası matris + işbirliği kontrolü — zemin onarılmadan başlamaz | ⏸ |
 | 4 — adım 2 | Melez soyisim, soy-arası matris, gruplar arası rekabet | ⏳ |
 
-Sonuçlar: **[docs/RAPOR.md](docs/RAPOR.md)** (konsolide) · [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/) · [docs/faz46/](docs/faz46/) · [docs/faz5/](docs/faz5/) · [docs/faz6/](docs/faz6/) · [docs/faz7/](docs/faz7/) · [docs/faz8/](docs/faz8/)
+Sonuçlar: **[docs/RAPOR.md](docs/RAPOR.md)** (konsolide) · [docs/faz1/](docs/faz1/) · [docs/faz2/](docs/faz2/) · [docs/faz3/](docs/faz3/) · [docs/faz4/](docs/faz4/) · [docs/faz4tani/](docs/faz4tani/) · [docs/faz45/](docs/faz45/) · [docs/faz46/](docs/faz46/) · [docs/faz5/](docs/faz5/) · [docs/faz6/](docs/faz6/) · [docs/faz7/](docs/faz7/) · [docs/faz8/](docs/faz8/) · [docs/faz9/](docs/faz9/)
