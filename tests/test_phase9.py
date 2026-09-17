@@ -370,3 +370,34 @@ class TestContinuousKinMeasurement(unittest.TestCase):
                       rules__kinship__kin_mode="binary")
         self.assertGreaterEqual(binary._kin_r(g(1, 2), g(2, 3)),
                                 binary.kin_out_threshold)
+
+
+class TestHybridLabelSurvivesSaveLoad(unittest.TestCase):
+    """Kaydedilmis bir melez koloni geri yuklendiginde SAF gorunmemeli."""
+
+    def test_surname2_round_trips(self):
+        import tempfile
+        from sinek.persistence import load_population, save_population
+
+        sim = make(steps=400, agents__initial_count=120, seed=3,
+                   rules__hybrid__enabled=True, rules__hybrid__rate=0.3)
+        live = sum(1 for a in sim.agents if a.genome.surname2 >= 0)
+        self.assertGreater(live, 0, "melez olusmamis: test bir sey olcmuyor")
+        with tempfile.TemporaryDirectory() as d:
+            path = save_population(os.path.join(d, "p.npz"), sim)
+            genomes, _ = load_population(path, sim.cfg)
+        self.assertEqual(sum(1 for g in genomes if g.surname2 >= 0), live)
+
+    def test_old_records_load_as_pure(self):
+        """Faz 9 oncesi kayitlarda `surname2` alani yok: hepsi SAF (-1)."""
+        import tempfile
+        from sinek.persistence import load_population, save_population
+
+        sim = make(steps=120, agents__initial_count=60, seed=3)
+        with tempfile.TemporaryDirectory() as d:
+            path = save_population(os.path.join(d, "p.npz"), sim)
+            with np.load(path, allow_pickle=False) as data:
+                keep = {k: data[k] for k in data.files if k != "surname2"}
+            np.savez_compressed(path, **keep)     # eski format taklidi
+            genomes, _ = load_population(path, sim.cfg)
+        self.assertTrue(all(g.surname2 == -1 for g in genomes))

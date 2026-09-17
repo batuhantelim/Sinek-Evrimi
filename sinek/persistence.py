@@ -32,6 +32,11 @@ def save_population(path: str, sim, note: str = "") -> str:
     weights = np.array([a.genome.weights for a in agents], dtype=np.float32)
     lineage = np.array([a.genome.lineage for a in agents], dtype=np.int64)
     surname = np.array([a.genome.surname for a in agents], dtype=np.int64)
+    # FAZ 9: MELEZ etiketin ikinci bileseni. Kayda yazilmazsa melez bir koloni
+    # diske yazilip geri yuklendiginde SAF gorunur — yani kaydedilmis bir
+    # melez zemin diye bir sey olamaz. (Ayni tuzagin parametre versiyonu Faz
+    # 6'da mekanigi sessizce oldurmustu.)
+    surname2 = np.array([getattr(a.genome, "surname2", -1) for a in agents], dtype=np.int64)
     fitness = np.array([a.fitness(sim.fitness_weights) for a in agents], dtype=np.float64)
 
     meta = {
@@ -56,6 +61,7 @@ def save_population(path: str, sim, note: str = "") -> str:
         weights=weights,
         lineage=lineage,
         surname=surname,
+        surname2=surname2,
         fitness=fitness,
         meta=json.dumps(meta),
     )
@@ -129,6 +135,9 @@ def load_population(
         lineage = data["lineage"]
         fitness = data["fitness"]
         surname = data["surname"] if "surname" in data.files else np.zeros(len(lineage), np.int64)
+        # Faz 9 oncesi kayitlarda bu alan yok: hepsi SAF soy (-1) sayilir.
+        surname2 = (data["surname2"] if "surname2" in data.files
+                    else np.full(len(lineage), -1, np.int64))
 
     meta["migrated"] = None
     if cfg is not None:
@@ -190,6 +199,7 @@ def load_population(
             weights=np.asarray(weights[i], dtype=np.float32).copy(),
             lineage=int(lineage[i]),
             surname=int(surname[i]),
+            surname2=int(surname2[i]),
         )
         for i in (int(k) for k in order)
     ]

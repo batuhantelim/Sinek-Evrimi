@@ -79,6 +79,7 @@ Hazır deneyler: [experiments/README.md](experiments/README.md)
 | 7 | Çeşitlilik denetimi: taze başlangıç çözmüyor; Faz 5 geçerli zeminde tekrarlandı | ✅ |
 | 8 | Yoğunluğa bağlı seçilim süpürgeyi durdurdu (4/5); ölçülebilir zemin kuruldu | ✅ |
 | 9 — bileşen 1 | Melez soyisim: ayrımcılık yok (3/3), ama mekanik ölçüm zeminini yiyor | ✅ |
+| 9 — revize | Sürekli akrabalık (oran): kısmen onardı (3/5), ölçütü geçmedi | ✅ |
 | 9 — bileşen 2–3 | Soy-arası matris + işbirliği kontrolü — zemin onarılmadan başlamaz | ⏸ |
 | 4 — adım 2 | Melez soyisim, soy-arası matris, gruplar arası rekabet | ⏳ |
 

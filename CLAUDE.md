@@ -49,6 +49,7 @@ davranış oradan **türer**.
 | **Faz 7** | Çeşitlilik denetimi: taze başlangıç ÇÖZMÜYOR; Faz 5 geçerli zeminde tekrarlandı | ✅ **tamam** |
 | **Faz 8** | Yoğunluğa bağlı seçilim süpürgeyi durdurdu (4/5); ölçülebilir zemin kuruldu | ✅ **tamam** |
 | **Faz 9 — bileşen 1** | Melez soyisim: ayrımcılık yok (3/3), ama mekanik ölçüm zeminini yiyor | ✅ **tamam** |
+| **Faz 9 — revize** | Sürekli akrabalık: zemini kısmen onardı (3/5), ölçüt geçilmedi | ✅ **tamam** |
 | **Faz 9 — bileşen 2–3** | Soy-arası matris + işbirliği kontrolü — zemin onarılmadan başlamaz | ⏸ |
 | **Faz 4 — adım 2** | Melez soyisim, soy-arası ilişki matrisi, gruplar arası rekabet | ⏳ |
 
@@ -58,6 +59,10 @@ Faz 6 mekaniği açık (partner seçimi + hafıza); Faz 7 ve Faz 8'in anahtarlar
 `rules.crowding.enabled: false`).
 İki bilinçli istisna: `rules.kinship.radius` 2.5'te bırakıldı (§3.11) ve
 "taze" varsayılanı pratikte doğru zemin değil (§3.12).
+Faz 9 revizesinden sonra `rules.kinship.kin_mode: ratio` varsayılan — saf
+soylarda eski ikili değerle **özdeş** olduğu için Faz 1–8'i değiştirmez
+(§3.15); melez açık koşan eski deney dosyası (`faz9_melez.yaml`) kendi
+`binary` rejimini pinler.
 Önceki fazlar `experiments/` altındaki hazır konfigürasyonlarla tek komutta
 yeniden üretilir.
 
@@ -81,7 +86,7 @@ sinek/
   genome.py             Genom (params + weights + soyisim) + gaussian mutasyon
   physics.py            Sıcak yol için dondurulmuş fizik sabitleri
   spatial.py            Uzamsal hash (Faz 3 ikili etkileşimleri için)
-  lineage.py            Faz 9: soy etiketi cebiri (akrabalık = ortak bileşen)
+  lineage.py            Faz 9: soy etiketi cebiri (akrabalık = SÜREKLİ ortak bileşen oranı)
   predator.py           Faz 4: ortak, dışsal, GRUP-KÖR avcı sürüsü
   persistence.py        Popülasyonu npz olarak kaydet/yükle
   simulation.py         Adım döngüsü + nesil döngüsü + seçilim
@@ -107,6 +112,8 @@ tools/partner_report.py   Faz 6 üç kol: önkoşul + asıl ölçüt + politika 
 tools/exclusion_probe.py  Dışlama: YAPISAL mı BİREYSEL mi; seçilmeyenlerin profili
 tools/diversity_report.py Faz 7/8: çeşitlilik ölçütü + çeşitliliğin bedeli (`--faz8-taban`)
 tools/hybrid_report.py    Faz 9: melez dışlanıyor mu / köprü mü (üç hücre, kontrole karşı)
+tools/kin_ratio_probe.py  Faz 9 revize: sürekli akrabalık formülünü ÖLÇEREK seçer
+tools/continuous_kin_report.py  Faz 9 revize: sürekli akrabalıkta zemin ölçülebilir mi
 tests/                  unittest — determinizm + faz testleri + araç/yöntem testleri
 ```
 
@@ -1001,6 +1008,63 @@ hareketi kısmak koloniyi çökertiyor).
 
 ---
 
+---
+
+## 3.15 Faz 9 revize: akrabalık sürekli oran
+
+Tam rapor: **[docs/faz9/surekli.md](docs/faz9/surekli.md)**
+Ölçüt (koşumlardan önce yazıldı): **[docs/faz9/olcut_surekli.md](docs/faz9/olcut_surekli.md)**
+
+### Akrabalık bir EŞİK değil, bir ORAN
+
+`sinek/lineage.py → kin_ratio`: paylaşılan bileşen oranı, 0.0–1.0.
+
+| formül | `{A,B}` vs `{B,C}` | saf X vs `{X,Y}` |
+|---|---|---|
+| **`jaccard`** (seçildi) | 1/3 | 1/2 |
+| `mean` | 1/2 | 2/3 |
+
+**Saf (tek bileşenli) etiketlerde ikisi de eski ikili değere indirgenir** —
+Faz 1–8'in `state_hash`'leri birebir korunur ve `kin_mode: binary` kolu Faz 9
+bileşen 1'i birebir tekrar eder (üçü de testle sabit).
+
+**Bu bir ÖLÇÜDÜR, davranış kuralı değil.** Sensör ham oranı taşır
+(`2r − 1`); hiçbir yerde `r > x ise paylaş` yoktur
+(`test_threshold_never_enters_a_behaviour_branch`). `rules.kinship.out_threshold`
+(0.5) **SALT ANALİZ** eşiğidir: yalnızca `opp_kin`/`opp_nonkin` ve üç hücreli
+melez matrisinin sınıflandırmasında kullanılır.
+
+### Formül ölçülerek seçildi — ve TARAFSIZ zeminde
+
+Seçim kuralı önceden ilan edildi: **çift bazında genom benzerliğiyle daha
+yüksek korelasyon**. Kalibrasyon `kin_mode: binary` koşumunda yapıldı; aday
+formülün kendi ürettiği popülasyonda ölçmek kendi varsayımını ölçmek olurdu.
+`jaccard` 3/3 seed'de önde (0.639/0.651/0.331 vs 0.620/0.596/0.295).
+
+### Sonuç: kısmen onardı, ölçütü geçmedi
+
+| kol | ölçüt B (etkin soy ≥5 **ve** dış-grup ≥%10 **ve** sağlık) |
+|---|---|
+| melez-yok (referans zemin) | **4/5** |
+| melez + ikili akrabalık | 2/5 |
+| **melez + sürekli akrabalık** | **3/5** |
+
+Yön doğru, büyüklük yetmiyor. **Seed'ler arası fark kol farkından büyük**:
+dış-grup payında sürekli−ikili farkı +4.7, **−37.7**, +0.1, +34.4, +5.6 puan.
+Bileşen 2–3 bu zemine **kurulmadı**.
+
+Kazanılan iki şey: (a) `lineage_effective` ile dış-grup payı artık **aynı
+yönde** (corr +0.699; bileşen 1'de zıttı), (b) melez ayrımcılığı sorusu farklı
+bir akrabalık tanımıyla ve 5 seed'le tekrarlandı: **FARK YOK 4/5**.
+
+### ⚠ Melez oranı yeniden kalibre edilmek zorunda kaldı
+
+`rate = 0.005`'te sürekli kolda melez payı %0.1'e düştü (soy çeşitliliği erken
+daraldı → melezleşecek farklı saf soy kalmadı), yani **melez önkoşulu geçmedi**
+ve o kollardan hiçbir şey okunamazdı. Ölçüt dosyasının kuralıyla en küçük
+geçen değer (**0.02**) pinlendi. ⚠ `0.05` asıl ölçütü de geçiyordu ve
+**seçilmedi**: seçmek, parametreyi istenen sonucu verene kadar ayarlamak olurdu.
+
 ## 4. Nasıl çalıştırılır
 
 ```bash
@@ -1011,7 +1075,7 @@ python run.py --steps 2000 --viz none    # sadece metrik, en hızlısı
 python run.py --viz pygame               # canlı pencere (SPACE: duraklat, Q: çık)
 python run.py --seed 7 --name deney7
 python run.py --check-determinism
-python -m unittest discover -s tests     # 199 test
+python -m unittest discover -s tests     # 218 test
 ```
 
 Hazır deneyler (`experiments/README.md`):
@@ -1123,6 +1187,28 @@ for k in melez melezyok karistirma; do
     --name f9_${k}_s42
 done
 python tools/hybrid_report.py --seeds 42 7 123
+```
+
+Faz 9 **revize** (sürekli akrabalık; oran 0.02'de pinlendi, tohum GEREKMEZ):
+
+```bash
+# 1) Formulu OLCEREK sec (tarafsiz zemin: binary kosum)
+python tools/kin_ratio_probe.py --seeds 42 7 123
+
+# 2) Dort kol, ayni seed, ayni rejim
+for s in 42 7 123 1 777; do
+  python run.py --config experiments/faz9_surekli.yaml --seed $s --viz none \
+    --set rules.hybrid.enabled=false --name f9d_melezyok_s$s
+  python run.py --config experiments/faz9_melez.yaml --seed $s --viz none \
+    --set rules.hybrid.rate=0.02 --name f9d_ikili_s$s        # bilesen 1'in olcusu
+  python run.py --config experiments/faz9_surekli.yaml --seed $s --viz none \
+    --set rules.hybrid.rate=0.02 --name f9d_surekli_s$s
+  python run.py --config experiments/faz9_surekli.yaml --seed $s --viz none \
+    --set rules.hybrid.rate=0.02 --set rules.kinship.control=shuffle_surnames \
+    --name f9d_karistirma_s$s
+done
+python tools/continuous_kin_report.py --prefix f9d --seeds 42 7 123 1 777
+python tools/hybrid_report.py --prefix f9d --main surekli --seeds 42 7 123 1 777
 ```
 
 Faz 4'ün 2×2'si (dört kol da Faz 2 tohumuyla, her biri kendi kontrolüyle):
@@ -1650,6 +1736,31 @@ Tam tablo: **[docs/faz9/melez.md](docs/faz9/melez.md)**
 - **Bileşen 2 (soy-arası matris) ve 3 (işbirliği kontrolü) HİÇ KOŞULMADI**:
   zemin onarılmadan başlanmaz.
 
+### Faz 9 revize — sürekli akrabalık (3 formül sondası + 3 oran kalibrasyonu + 5 seed × 4 kol)
+
+Tam tablo: **[docs/faz9/surekli.md](docs/faz9/surekli.md)**
+
+- **Ölçüt B geçilmedi: 3/5 seed** (ölçüt 5/5 istiyordu). Sürekli ölçü ikiliden
+  iyi (2/5) ama referans zeminin (melez-yok, 4/5) altında. **Bileşen 2–3 bu
+  zemine kurulmadı.**
+- **Geriye dönük uyum kanıtlandı**: saf soylarda iki mod birebir aynı hash;
+  `ikili` kolu bileşen 1'in dış-grup paylarını (%31.0 / %1.8 / %6.6) birebir
+  tekrarladı. Enerji korunumu 15/15 koşumda tam.
+- **Formül ölçülerek seçildi** (`jaccard`, 3/3 seed), üstelik **tarafsız
+  zeminde**: kalibrasyon `binary` koşumunda yapıldı.
+- **`lineage_effective` ile dış-grup payı artık AYNI yönde** (corr +0.699,
+  15 nokta) — bileşen 1'de zıt yöndeydiler. Etiket enflasyonunun ölçümü
+  kandırma kanalı kapandı.
+- **Mandal duruyor**: melez payı yine %44–93'e tırmanıyor. Sürekli akrabalık
+  onu çözmüyor, yalnızca zararını kısmen tolere ediyor.
+- **Melez ayrımcılığı yine YOK: FARK YOK 4/5** (DIŞLAMA 0/5, KÖPRÜ 1/5) —
+  bileşen 1'in sonucu farklı bir akrabalık tanımıyla ve 5 seed'le tekrarlandı.
+- **Asimetri BEŞİNCİ kez**: yabancıya saldırı, bilgisiz kontrolün 10–20 katı
+  (4/5 seed); paylaşımda böyle bir ayrım yok.
+- **⚠ Artefakt**: `population.npz` `surname2`'yi hiç yazmıyordu — kaydedilmiş
+  bir melez koloni geri yüklendiğinde **saf** görünüyordu. Düzeltildi, eski
+  kayıtlar hâlâ yükleniyor (alan yoksa hepsi saf sayılır).
+
 ### Kalibrasyon notları
 
 **Sıcak yol.** `sense`/`apply_motors` içinde config ağacı dolaşmak ve skaler
@@ -1738,15 +1849,25 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
    (dış-grup payı 2/3 seed'de %10'un altına). **Soy-arası matris ve işbirliği
    kontrolü bu zemine kurulmaz** — Faz 5/6'nın hatası olurdu. Önce doyum
    çözülmeli; denenmemiş üç seçenek §3.14'te.
-10. **Melez soyismin ESKİ notu (kısmen aşıldı)**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
+10. ⏸ **Sürekli akrabalık zemini KISMEN onardı (§3.15).** Akrabalık artık
+   paylaşılan bileşen oranı (`jaccard`, ölçülerek seçildi) ve sensöre ham
+   giriyor. Ölçülebilirlik 2/5 → 3/5 çıktı ama referans zeminin (4/5) altında,
+   yani **ölçüt geçilmedi**; seed'ler arası fark kol farkından büyük.
+   `lineage_effective` ile dış-grup payı artık aynı yönde (+0.699) ve melez
+   ayrımcılığı sorusu 5 seed'de tekrarlandı (FARK YOK 4/5). **Bileşen 2–3 hâlâ
+   beklemede.** Denenmemiş üç kaldıraç: (a) melez saf döllemesin (mandalın
+   kaynağı o kural), (b) melezleşme menzilini daraltmak (⚠ Faz 4.6: hareketi
+   kısmak koloniyi çökertiyor), (c) Faz 8'in denenmemiş iki kaldıracı (geniş
+   dünya, uzamsal sığınaklar) ile melez-yok zeminini yukarı çekmek.
+11. **Melez soyismin ESKİ notu (kısmen aşıldı)**: `Genome.surname` tek tam sayı. Faz 4'te X-Y birleşik
    etiket olacak; `lineage_stats`, `kin_assortment` ve kontrol grupları
    etiketi yalnızca **eşitlik** üzerinden kullanır, dolayısıyla etiket tipini
    değiştirmek bu kodu bozmaz — kısmi akrabalık isteniyorsa
    `agent.sense`'teki `kin` hesabı sürekli bir orana çevrilir.
-11. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
+12. **Soy-arası ilişki matrisi**: `opp_kin`/`opp_nonkin` ikili sayımı
    `(soy_i, soy_j)` matrisine genişletilecek. `stratified_kin_bias`
    `action` parametresiyle zaten genel; hücre başına da uygulanabilir.
-12. Adım 2 tohumu: ⚠ **artık tohum gerekmiyor** — `experiments/faz8_yogunluk.yaml`
+13. Adım 2 tohumu: ⚠ **artık tohum gerekmiyor** — `experiments/faz8_yogunluk.yaml`
    taze başlangıçta ölçülebilir çeşitlilik veriyor (§3.13). Tohumlu alternatifler:
    `docs/faz8/population_cok_soylu.npz` (çok soylu),
    `docs/faz4tani/population_taban.npz` (§3.12); diğerleri:
@@ -1939,4 +2060,31 @@ Popülasyonu büyütmek GA'yı otomatik iyileştirmez.
   doğumların binde beşi melez olsa bile payı %53'e çıkardı: oran yalnızca
   **hızı** belirliyor, doyumu değil. Yeni bir etiket kuralı yazarken "geri
   dönüşü var mı" diye sorun; yoksa kaçınılmaz olarak doyar.
+- **KATEGORİ SINIRINI ÖLÇÜYE ÇEVİRİRKEN EŞİĞİ ÖNCEDEN VE AYRI YAZIN.** Faz 9
+  revizesinde akrabalık sürekli orana çevrildi; sensöre **ham** oran girer,
+  fakat in/out sayımı bir eşik ister. O eşik (`out_threshold: 0.5`) koşumdan
+  önce ilan edildi ve **yalnızca analizde** kullanılır — kaynak testi karar
+  dalına sızmadığını denetler. Ölçünün kendisi ile ölçüyü raporlamak için
+  kullanılan kategori ayrı şeylerdir; ikisini aynı yerde tanımlarsanız
+  "eşiği sonuçtan sonra seçtim" itirazına cevabınız kalmaz.
+- **İKİ ADAY FORMÜL VARSA TARAFSIZ ZEMİNDE KIYASLAYIN.** `jaccard` ile `mean`
+  arasındaki seçim, adaylardan biriyle koşulmuş bir popülasyonda ölçülseydi
+  kendi varsayımını ölçmüş olurdu; kalibrasyon bu yüzden `binary` koşumunda
+  yapıldı. Ve seçim ölçütü (genom benzerliğiyle korelasyon) **ölçülebilirlik
+  sonucundan bağımsız** ilan edildi — yoksa "hangisi istediğim tabloyu
+  veriyorsa o" olurdu.
+- **ÖNKOŞULU GEÇMEYEN KOLDAN SONUÇ OKUMAYIN — ÖNKOŞUL KOLDAN KOLA DEĞİŞİR.**
+  Aynı `rate` (0.005) ikili kolda %53 melez üretirken sürekli kolda %0.1'de
+  kaldı: mekanik aynı, zemin farklı. Önkoşul olmasaydı "sürekli akrabalık
+  dış-grup payını korudu" diye yanlış pozitif raporlanacaktı — oysa orada
+  okunacak melez yoktu.
+- **KALİBRASYONDA "ÖLÇÜTÜ GEÇEN EN KÜÇÜK" KURALINA SADIK KALIN.** Faz 9
+  revizesinde `rate = 0.05` asıl ölçütü de geçiyordu ve **seçilmedi**; kural
+  önkoşulu geçen en küçük değeri (0.02) söylüyordu. Seçilseydi parametre,
+  istenen sonucu verene kadar ayarlanmış olurdu. Reddedilen değeri de raporlayın.
+- **KALICI DURUMUN HEPSİNİ DİSKE YAZIN.** `population.npz` `surname2`'yi hiç
+  kaydetmiyordu: kaydedilmiş bir melez koloni geri yüklendiğinde **saf**
+  görünüyordu, yani "melez tohum" diye bir şey olamazdı. Faz 6'da aynı tuzağın
+  parametre versiyonu mekaniği sessizce öldürmüştü. Genoma yeni bir alan
+  eklerken kayıt/yükleme yuvarlak testini de yazın.
 - Test: `python -m unittest discover -s tests` yeşil kalmalı.
